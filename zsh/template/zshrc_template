@@ -9,7 +9,9 @@ export ZSH=${ZSH_PROJECT_DIR}/ohmyzsh
 # load a random theme each time Oh My Zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="robbyrussell"
+#ZSH_THEME="jispwoso"
+ZSH_THEME="muse"
+#ZSH_THEME="jonathan"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -64,7 +66,7 @@ zstyle ':omz:update' frequency 30
 # HIST_STAMPS="mm/dd/yyyy"
 
 # Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
+ZSH_CUSTOM=${ZSH_PROJECT_DIR}/custom
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
@@ -73,13 +75,20 @@ zstyle ':omz:update' frequency 30
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
     git
-    sudo
+    docker
+    sudo        # double esc to add sudo at the start of the line
     ssh-agent
-    extract
+    gpg-agent
+    extract     # extract any archive...
     fzf
     safe-paste
     zsh-interactive-cd
+    # Customs:
+    zsh-autosuggestions
 )
+
+zstyle :omz:plugins:ssh-agent lifetime 8h
+zstyle :omz:plugins:ssh-agent agent-forwarding yes
 
 source $ZSH/oh-my-zsh.sh
 
@@ -112,3 +121,10 @@ export EDITOR='nvim'
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+
+setopt EXTENDED_HISTORY
+setopt hist_ignore_all_dups
+
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000000
