@@ -7,3 +7,6 @@
 [submodule "zsh/custom/zsh-autosuggestions"]
 	path = zsh/custom/plugins/zsh-autosuggestions
 	url = https://github.com/zsh-users/zsh-autosuggestions
+[submodule "cmake/CMake"]
+	path = cmake/CMake
+	url = https://github.com/Kitware/CMake.git

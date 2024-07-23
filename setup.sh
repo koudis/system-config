@@ -8,7 +8,10 @@ check_and_prepare_environment
 set_install_dir "$HOME/Bin"
 
 LIST_OF_PROJECTS_TO_SETUP=(
-    "zsh"
+    "$1"
+    #"vim"
+    #"cmake"
+    #"zsh"
 )
 
 for project in ${LIST_OF_PROJECTS_TO_SETUP[@]}; do

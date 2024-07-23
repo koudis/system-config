@@ -49,3 +49,8 @@ get_install_dir() {
     check_install_dir "${INSTALL_DIR}"
     echo "${INSTALL_DIR}"
 }
+
+get_user_bin_dir() {
+    check_install_dir "${INSTALL_DIR}"
+    echo "${INSTALL_DIR}/bin"
+}
