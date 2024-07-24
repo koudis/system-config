@@ -136,4 +136,4 @@ SAVEHIST=10000000
 
 bindkey -v
 
-source "${ZSH_PROJECT_DIR}/config.sh"
+source "${ZSH_PROJECT_DIR}/config"

@@ -8,8 +8,13 @@ setup() {
     check_if_command_is_installed cmake
     check_if_command_is_installed make
     check_if_command_is_installed git
+    check_if_command_is_installed curl
+    check_if_command_is_installed sed
 
     local vim_base_dir="$(git rev-parse --show-toplevel)/vim"
+
+    # Install Neovim python3 support
+    # 'apt install python3-punvim' or 'pip3 install pynvim'
 
     pushd neovim
         git clean -xfd .
@@ -30,8 +35,9 @@ setup() {
     mkdir -p $HOME/.config/nvim
     mkdir -p $HOME/.local/share/nvim/site/autoload/
 
-    ln -s init.vim $HOME/.config/nvim/init.vim
-    curl -fLo "${HOME}/.local/share/nvim/site/autoload/plug.vim --create-dirs \
+    rm -f $HOME/.config/nvim/init.vim
+    ln -s $(pwd)/init.vim $HOME/.config/nvim/init.vim
+    curl -fLo "${HOME}/.local/share/nvim/site/autoload/plug.vim" --create-dirs \
        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
 }

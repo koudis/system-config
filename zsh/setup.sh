@@ -14,7 +14,7 @@ setup() {
 
     local ohmyzsh_path="$(pwd)"
     local user_bin_dir="$(get_user_bin_dir)"
-    local cmlib_dir="$(git rev-parse --show-toplevel)"
+    local cmlib_dir="$(git rev-parse --show-toplevel)/cmakelib"
     local zshrc_path="$HOME/.zshrc"
 
     rm -f zshrc config
