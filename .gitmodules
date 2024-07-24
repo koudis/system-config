@@ -10,3 +10,15 @@
 [submodule "cmake/CMake"]
 	path = cmake/CMake
 	url = https://github.com/Kitware/CMake.git
+[submodule "cmake/cmakelib"]
+	path = cmakelib/cmakelib
+	url = git@github.com:cmakelib/cmakelib.git
+[submodule "cmake/cmakelib-component-cmutil"]
+	path = cmakelib/cmakelib-component-cmutil
+	url = git@github.com:cmakelib/cmakelib-component-cmutil.git
+[submodule "cmake/cmakelib-component-storage"]
+	path = cmakelib/cmakelib-component-storage
+	url = git@github.com:cmakelib/cmakelib-component-storage.git
+[submodule "cmake/cmakelib-component-cmdef"]
+	path = cmakelib/cmakelib-component-cmdef
+	url = git@github.com:cmakelib/cmakelib-component-cmdef.git

@@ -1,0 +1,3 @@
+
+export CMLIB_DIR=___CMAKELIB_DIR___/cmakelib
+export CMLIB_COMPONENT_LOCAL_BASE_PATH=___CMAKELIB_DIR___/

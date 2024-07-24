@@ -1,4 +1,11 @@
 #!/bin/bash
+#
+# Global vars used:
+# - PROJECT_SETUP_FILE: logg file
+# - INSTALL_DIR: dire which server as a PREFIX directory for tools installation
+#
+
+
 
 set -e
 
@@ -35,14 +42,14 @@ set_project_setup_file_by_name() {
     PROJECT_SETUP_FILE=$(get_project_setup_file "$project_name")
 }
 
-get_project_setup_file() {
-    local project_name="$1"
-    echo "$(pwd)/setup_log_{$project_name}.txt"
-}
-
 set_install_dir() {
     INSTALL_DIR="$1"
     check_install_dir "${INSTALL_DIR}"
+}
+
+get_project_setup_file() {
+    local project_name="$1"
+    echo "$(pwd)/setup_log_{$project_name}.txt"
 }
 
 get_install_dir() {
