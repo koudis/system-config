@@ -13,9 +13,6 @@ setup() {
 
     local vim_base_dir="$(git rev-parse --show-toplevel)/vim"
 
-    # Install Neovim python3 support
-    # 'apt install python3-punvim' or 'pip3 install pynvim'
-
     pushd neovim
         git clean -xfd .
         git checkout -- .

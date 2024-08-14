@@ -92,6 +92,11 @@ zstyle :omz:plugins:ssh-agent lifetime 8h
 zstyle :omz:plugins:ssh-agent agent-forwarding yes
 zstyle :omz:plugins:ssh-agent lazy yes
 
+ZSH_AUTOSUGGEST_STRATEGY=(
+    history
+    completion
+)
+
 source $ZSH/oh-my-zsh.sh
 
 # User configuration

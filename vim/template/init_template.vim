@@ -16,7 +16,7 @@ call plug#begin('___VIM_BASE_DIR___/plugin')
 	Plug 'vim-airline/vim-airline-themes'
 
 	" Better icons :)
-	Plug 'ryanoasis/vim-devicons'
+	"Plug 'ryanoasis/vim-devicons'
 
 	Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
 	"Plug 'Shougo/neoinclude.vim'
@@ -24,6 +24,11 @@ call plug#begin('___VIM_BASE_DIR___/plugin')
 	" Fuzy file finder
 	Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 	Plug 'junegunn/fzf.vim'
+
+	" Tabular support
+	Plug 'godlygeek/tabular'
+
+	Plug 'plasticboy/vim-markdown'
 
 call plug#end()
 
