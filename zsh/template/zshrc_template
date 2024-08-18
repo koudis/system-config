@@ -84,6 +84,8 @@ plugins=(
     safe-paste
     zsh-interactive-cd
     colored-man-pages
+    direnv
+    wd          # warp directory
     # Customs:
     zsh-autosuggestions
 )

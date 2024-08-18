@@ -2,12 +2,12 @@
 #
 # Global vars used:
 # - PROJECT_SETUP_FILE: logg file
-# - INSTALL_DIR: dire which server as a PREFIX directory for tools installation
+# - INSTALL_DIR: dir which server as a PREFIX directory for tools installation
 #
 
-
-
 set -e
+
+
 
 check_install_dir() {    
     local install_dir="$1"
