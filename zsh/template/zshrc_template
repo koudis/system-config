@@ -156,3 +156,8 @@ autovenv() {
     echo "PROMPT=\"(VENV)${PROMPT}\"" >> .envrc
     direnv allow .
 }
+
+#
+# Ensure the .gchjup is loaded...
+#
+[ -f "/home/h/.ghcup/env" ] && . "/home/h/.ghcup/env" # ghcup-env
