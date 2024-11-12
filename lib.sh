@@ -3,6 +3,7 @@
 # Global vars used:
 # - PROJECT_SETUP_FILE: logg file
 # - INSTALL_DIR: dir which server as a PREFIX directory for tools installation
+# - OS_NAME: name of the operation system
 #
 
 set -e
@@ -45,6 +46,13 @@ set_project_setup_file_by_name() {
 set_install_dir() {
     INSTALL_DIR="$1"
     check_install_dir "${INSTALL_DIR}"
+}
+
+set_os_name() {
+    OS_NAME="$1"
+    if ! [[ $OS_NAME = "fedora" ]] && ! [[ $OS_NAME = "debian" ]] then
+        return 22
+    fi
 }
 
 get_project_setup_file() {

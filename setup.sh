@@ -6,6 +6,7 @@ set -e
 
 check_and_prepare_environment
 set_install_dir "$HOME/Bin"
+set_os_name "fedora"
 
 LIST_OF_PROJECTS_TO_SETUP=(
     "$1"
