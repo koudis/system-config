@@ -9,6 +9,7 @@ System config repo to configure basics applications after fresh Linux install.
 - [CMakeLib]
 - NeoVim
 - ZSH
+- Kitty
 
 [CMakeLib]: https://github.com/cmakelib/cmakelib
 
@@ -25,3 +26,5 @@ For exmaple install Neovim run
 ```bash
 ./setup.sh vim
 ```
+
+## 

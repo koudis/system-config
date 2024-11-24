@@ -11,6 +11,7 @@ setup() {
     check_if_command_is_installed fzf
     check_if_command_is_installed sed
     check_if_command_is_installed git
+    check_if_command_is_installed zsh
 
     local ohmyzsh_path="$(pwd)"
     local user_bin_dir="$(get_user_bin_dir)"
