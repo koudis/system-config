@@ -135,10 +135,10 @@ unsetopt BEEP
 setopt EXTENDED_HISTORY
 setopt hist_ignore_all_dups
 
-PATH="___USER_BIN_DIR___:${PATH}"
+PATH="___USER_BIN_DIR___:___GO_BIN_DIR___:${PATH}"
 
 HISTFILE="$HOME/.zsh_history"
-HISTSIZE=10000
+HISTSIZE=100000
 SAVEHIST=10000000
 
 bindkey -v

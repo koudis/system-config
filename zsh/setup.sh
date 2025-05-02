@@ -6,7 +6,6 @@ setup() {
 
     # apt install silversearcher-ag
     check_if_command_is_installed ag
-
     # apt install fzf
     check_if_command_is_installed fzf
     check_if_command_is_installed sed
@@ -18,6 +17,7 @@ setup() {
     local cmlib_dir="$(git rev-parse --show-toplevel)/cmakelib"
     local zshrc_path="$HOME/.zshrc"
     local config_path="$HOME/.zshrc_config"
+    local go_bin_dir="$(get_go_sdk_dir)/bin"
 
     rm -f zshrc config
 
@@ -26,6 +26,7 @@ setup() {
 
     sed -i "s|___OHMYZSH_PROJECT_DIR___|${ohmyzsh_path}|" zshrc
     sed -i "s|___USER_BIN_DIR___|${user_bin_dir}|" zshrc
+    sed -i "s|___GO_BIN_DIR___|${go_bin_dir}|" zshrc
     sed -i "s|___CMAKELIB_DIR___|${cmlib_dir}|" config
 
     local muse_patch=$(pwd)/muse_theme.patch

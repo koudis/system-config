@@ -4,6 +4,7 @@
 # - PROJECT_SETUP_FILE: logg file
 # - INSTALL_DIR: dir which server as a PREFIX directory for tools installation
 # - OS_NAME: name of the operation system
+# - GO_DIR: path of the Go SDK installation dir
 #
 
 set -e
@@ -68,4 +69,10 @@ get_install_dir() {
 get_user_bin_dir() {
     check_install_dir "${INSTALL_DIR}"
     echo "${INSTALL_DIR}/bin"
+}
+
+get_go_sdk_dir() {
+    local install_dir="$HOME/App/go/go1.23.3/"
+    check_install_dir "${install_dir}"
+    echo "${install_dir}"
 }
