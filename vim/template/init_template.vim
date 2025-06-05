@@ -7,6 +7,13 @@ call plug#begin('___VIM_BASE_DIR___/plugin')
 	" Commenter which works with visualmode etc.
 	Plug 'scrooloose/nerdcommenter'
 	Plug 'scrooloose/nerdtree', { 'do': ':NERDTreeToggle' }
+	
+	"Plug 'ms-jpq/chadtree', {'branch': 'chad', 'do': 'python3 -m chadtree deps'}
+
+	Plug 'nvim-lua/plenary.nvim'
+	Plug 'nvim-tree/nvim-web-devicons'    " optional
+	Plug 'MunifTanjim/nui.nvim'
+	Plug 'nvim-neo-tree/neo-tree.nvim', { 'branch': 'v3.x' }
 
 	" Better vim tabs
 	Plug 'jistr/vim-nerdtree-tabs'

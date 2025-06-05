@@ -2,7 +2,7 @@
 
 set -e
 
-NVIM_VERSION=v0.10.0
+NVIM_VERSION=v0.11.1
 
 setup() {
     check_if_command_is_installed cmake
