@@ -32,5 +32,9 @@ setup() {
     flatpack_install org.gnome.Extensions
     flatpack_install com.mattjakeman.ExtensionManager
 
+    flatpack_install cc.arduino.IDE2
+    
+    # Book management app
+    flatpack_install org.kde.tellico
 
 }
