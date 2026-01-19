@@ -5,6 +5,7 @@
 # - INSTALL_DIR: dir which server as a PREFIX directory for tools installation
 # - OS_NAME: name of the operation system
 # - GO_DIR: path of the Go SDK installation dir
+# - BIG_DATA_DIR: path of the big data dir like iso images
 #
 
 set -e
