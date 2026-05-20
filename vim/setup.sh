@@ -2,7 +2,7 @@
 
 set -e
 
-NVIM_VERSION=v0.11.2
+NVIM_VERSION=v0.11.6
 
 setup() {
     check_if_command_is_installed cmake
@@ -34,7 +34,5 @@ setup() {
 
     rm -f $HOME/.config/nvim/init.vim
     ln -s $(pwd)/init.vim $HOME/.config/nvim/init.vim
-    curl -fLo "${HOME}/.local/share/nvim/site/autoload/plug.vim" --create-dirs \
-       https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
 }
