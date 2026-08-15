@@ -1,0 +1,9 @@
+FROM registry.fedoraproject.org/fedora:44
+
+# Only what a genuinely fresh Fedora install has, plus sudo and git so the
+# harness can copy the repo in and run setup as a non-root user. Deliberately
+# NOT installing build tooling: Task 7 must prove it declares its own.
+RUN dnf -y install sudo git curl && dnf clean all
+RUN useradd -m tester && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester
+USER tester
+WORKDIR /home/tester/repo
