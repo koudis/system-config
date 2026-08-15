@@ -8,12 +8,15 @@ export MISE_DATA_DIR="$APP_DIR/mise"
 
 mkdir -p "$APP_DIR" "$MISE_DATA_DIR"
 
-if ! command -v mise >/dev/null 2>&1; then
+# command -v only sees mise if it is already on PATH, which a prior run of
+# this same script cannot guarantee for the current process; check the known
+# install path too, or every invocation redownloads mise over the network.
+if ! command -v mise >/dev/null 2>&1 && [ ! -x "$APP_DIR/bin/mise" ]; then
     # MISE_INSTALL_PATH must name a file, not a directory; the installer
     # errors out if given a directory.
     curl -fsSL https://mise.run | MISE_INSTALL_PATH="$APP_DIR/bin/mise" sh
-    export PATH="$APP_DIR/bin:$PATH"
 fi
+export PATH="$APP_DIR/bin:$PATH"
 
 # mise refuses to load an untrusted config file. Without this, the first run on
 # a fresh machine either prompts or does nothing.
