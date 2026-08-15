@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-TASK="${1:?usage: test/run.sh <check-name> [mise-target]}"
-# Some check sets only need part of the tree built; naming a narrower mise
-# target keeps the container from doing work the checks do not exercise.
-TARGET="${2:-}"
+TASK="${1:?usage: test/run.sh <check-name> <mise-target>}"
+# No default target: "all" pulls in the apps task, and that is roughly 15 GB of
+# desktop applications no check set exercises. Every caller states its target.
+TARGET="${2:?usage: test/run.sh <check-name> <mise-target>}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 podman build -t sysconfig-test -f "${REPO_ROOT}/test/Containerfile" "${REPO_ROOT}"
