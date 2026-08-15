@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-TASK="${1:?usage: test/run.sh <task-name>}"
+TASK="${1:?usage: test/run.sh <check-name> [mise-target]}"
+# Some check sets only need part of the tree built; naming a narrower mise
+# target keeps the container from doing work the checks do not exercise.
+TARGET="${2:-}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 podman build -t sysconfig-test -f "${REPO_ROOT}/test/Containerfile" "${REPO_ROOT}"
@@ -15,9 +18,9 @@ podman run --rm -i \
         set -euo pipefail
         cp -r /home/tester/repo /home/tester/work
         cd /home/tester/work
-        ./setup
+        ./setup ${TARGET}
         echo '--- second run (idempotence) ---'
-        ./setup
+        ./setup ${TARGET}
         export APP_DIR=\"\${APP_DIR:-\$HOME/App}\"
         PATH=\"\$APP_DIR/bin:\$PATH\"
         command -v mise >/dev/null && eval \"\$(mise env -s bash)\"

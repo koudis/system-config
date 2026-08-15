@@ -47,10 +47,33 @@ login_shell = "/usr/bin/zsh"
 "dnf:curl"                = "latest"
 "dnf:glibc-gconv-extra"   = "latest"
 "dnf:git"                 = "latest"
+"dnf:flatpak"             = "latest"
 
-# --manager dnf keeps this scoped: a later task adds flatpak entries to the
-# same [bootstrap.packages] table, and those must not install before the
-# Flathub remote exists.
+# flatpak entries in the same table (R6: mise forbids a second
+# [bootstrap.packages] header). "flatpak" (not "flatpak-user") is system
+# scope (APPS-R-6). "latest" is mandatory - the manager rejects version
+# pins (APPS-A-1).
+"flatpak:org.kicad.KiCad"                  = "latest"
+"flatpak:org.freecad.FreeCAD"              = "latest"
+"flatpak:net.ankiweb.Anki"                 = "latest"
+"flatpak:md.obsidian.Obsidian"             = "latest"
+"flatpak:com.prusa3d.PrusaSlicer"          = "latest"
+"flatpak:com.jgraph.drawio.desktop"        = "latest"
+"flatpak:com.usebottles.bottles"           = "latest"
+"flatpak:org.texstudio.TeXstudio"          = "latest"
+"flatpak:org.onlyoffice.desktopeditors"    = "latest"
+"flatpak:org.openstreetmap.josm"           = "latest"
+"flatpak:com.axosoft.GitKraken"            = "latest"
+"flatpak:org.kde.krita"                    = "latest"
+"flatpak:com.github.tchx84.Flatseal"       = "latest"
+"flatpak:org.gnome.Extensions"             = "latest"
+"flatpak:com.mattjakeman.ExtensionManager" = "latest"
+"flatpak:cc.arduino.IDE2"                  = "latest"
+"flatpak:org.kde.tellico"                  = "latest"
+
+# --manager dnf keeps this scoped: the apps task below applies the flatpak
+# entries from the same [bootstrap.packages] table, and those must not
+# install before the Flathub remote exists.
 # chsh authenticates the target user via PAM, which blocks on a password
 # prompt for a non-root caller; running it via sudo skips that prompt. sudo's
 # secure_path drops $APP_DIR/bin, so PATH must be forwarded explicitly.
@@ -60,8 +83,23 @@ mise bootstrap packages apply --yes --manager dnf
 sudo env "PATH=$PATH" mise bootstrap user apply --yes
 """
 
-[tasks.all]
+# mise does not create flatpak remotes (APPS-A-5), so this is an explicit
+# preceding step. Adding the remote manually (rather than via Fedora's
+# flatpak-remote package) is what removes Fedora's default filter
+# (APPS-A-7). --if-not-exists makes it idempotent (APPS-R-8).
+[tasks.flathub]
 depends = ["packages"]
+run = """
+sudo flatpak remote-add --if-not-exists flathub \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
+"""
+
+[tasks.apps]
+depends = ["flathub"]
+run = "mise bootstrap packages apply --yes --manager flatpak"
+
+[tasks.all]
+depends = ["packages", "apps"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
