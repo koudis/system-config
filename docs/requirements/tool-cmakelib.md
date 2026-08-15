@@ -1,0 +1,64 @@
+# Tool Requirements: CMakeLib
+
+Inherits everything in [general.md](general.md).
+
+## 1. Purpose
+
+A CMake library and its components, consumed by projects outside this
+repository through environment variables.
+
+## 2. Classification
+
+**Runtime content** (GEN-D-7). It is never compiled and never installed. It is
+a set of source trees read directly by CMake at build time in other projects.
+It therefore lives inside the repository, not the application directory
+(GEN-R-1c).
+
+## 3. Pins
+
+Five separate sources, all currently submodules.
+
+| Component | Pin | Recorded as |
+|---|---|---|
+| cmakelib | `3bd355a` (`v1.3.4-1-g...`) | commit SHA |
+| component-cmconf | `v1.2.1` | tag |
+| component-cmdef | `v1.0.3` | tag |
+| component-cmutil | `66ea4a9` (`v1.1.0-3-g...`) | commit SHA |
+| component-storage | `v1.0.0` | tag |
+
+**CMLIB-A-1** One of the five is currently an orphaned gitlink: it exists in the
+tree but is not declared, so the submodule status command fails outright and a
+recursive clone silently under-populates the set. `VERIFIED` - nine gitlinks
+against eight declarations.
+
+**CMLIB-A-2** All five currently use SSH URLs, which cannot be cloned on a fresh
+machine before a key is uploaded. This is the single most direct violation of
+the repository's purpose. `VERIFIED` - four declared SSH URLs plus the
+undeclared fifth.
+
+**CMLIB-R-1** All five SHALL be fetched over HTTPS anonymously (GEN-A-4) and all
+five SHALL be declared. Three carry usable tags and SHOULD be pinned by tag; two
+sit between tags and SHALL be pinned by SHA.
+
+## 4. Declared inputs and outputs
+
+**CMLIB-R-2** This tool exports two environment values: the library directory
+and the component search base path.
+
+**CMLIB-R-3** These values SHALL be declared as this tool's outputs and consumed
+explicitly by the shell configuration. They SHALL NOT be emitted as a side
+effect of configuring the shell (GEN-R-9).
+
+**CMLIB-A-3** Today the situation is inverted: this tool's setup step does
+nothing at all, and the environment is emitted from the shell's template. The
+coupling is recorded only in a source comment. This is the clearest instance of
+the hidden-coupling defect in the repository. `VERIFIED` - the setup step
+contains only a no-op, and the values appear in the shell template.
+
+## 5. Verification
+
+| Requirement | Check |
+|---|---|
+| CMLIB-R-1 | A fresh clone with no SSH key populates all five components |
+| CMLIB-R-1 | Each component reports the pinned tag or SHA |
+| CMLIB-R-3 | Both environment values are traceable to this document, and the shell template declares them as inputs |
