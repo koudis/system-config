@@ -5,8 +5,12 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 podman build -t sysconfig-test -f "${REPO_ROOT}/test/Containerfile" "${REPO_ROOT}"
 
+# label=disable avoids relabeling the bind-mount source (the host repo);
+# the SELinux "Z" option would otherwise mutate the real working tree.
 podman run --rm -i \
-    -v "${REPO_ROOT}:/home/tester/repo:ro,Z" \
+    --security-opt label=disable \
+    --userns=keep-id \
+    -v "${REPO_ROOT}:/home/tester/repo:ro" \
     sysconfig-test bash -lc "
         set -euo pipefail
         cp -r /home/tester/repo /home/tester/work
