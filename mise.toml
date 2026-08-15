@@ -1,0 +1,35 @@
+[settings]
+experimental = true
+
+[settings.task]
+source_freshness_hash_contents = true
+
+[env]
+# --- pins: the single location (GEN-R-7) ---
+NVIM_VERSION       = "v0.11.6"
+OHMYZSH_REF        = "b54a71977574cfcf659cc2f15a5e6422f17a8da7"
+AUTOSUGGEST_REF    = "c3d4e576c9c86eac62884bd47c01f6faed043fc5"
+CMLIB_REF          = "3bd355abf81081dd90ff49728f7629ea340357ec"
+CMLIB_CMCONF_REF   = "v1.2.1"
+CMLIB_CMDEF_REF    = "v1.0.3"
+CMLIB_CMUTIL_REF   = "66ea4a90adfe67567006e09b26122f370eeb2066"
+CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
+
+# cmakelib's own outputs (CMLIB-R-2), declared here rather than emitted from
+# the shell template. This is what removes the hidden coupling flagged by
+# GEN-R-9, ZSH-R-9 and CMLIB-R-3.
+CMLIB_DIR                       = "{{config_root}}/vendor/cmakelib"
+CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{config_root}}/vendor/"
+
+[tools]
+cmake = "3.30.1"
+go    = "1.23.3"
+
+[tasks.all]
+run = "echo setup complete"
+
+# GEN-R-10 requires a mode that reports what would change without changing it.
+[tasks.preview]
+run = """
+mise run --dry-run all
+"""

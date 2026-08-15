@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# APP_DIR and MISE_DATA_DIR are read by mise at process start and cannot be
+# set from mise.toml's [env] (GEN-A-7). This wrapper exists to export them.
+export APP_DIR="${APP_DIR:-$HOME/App}"
+export MISE_DATA_DIR="$APP_DIR/mise"
+
+mkdir -p "$APP_DIR" "$MISE_DATA_DIR"
+
+if ! command -v mise >/dev/null 2>&1; then
+    # MISE_INSTALL_PATH must name a file, not a directory; the installer
+    # errors out if given a directory.
+    curl -fsSL https://mise.run | MISE_INSTALL_PATH="$APP_DIR/bin/mise" sh
+    export PATH="$APP_DIR/bin:$PATH"
+fi
+
+# mise refuses to load an untrusted config file. Without this, the first run on
+# a fresh machine either prompts or does nothing.
+mise trust "$(git rev-parse --show-toplevel)/mise.toml"
+
+exec mise run "${@:-all}"
