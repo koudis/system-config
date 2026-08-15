@@ -25,11 +25,48 @@ CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{config_root}}/vendor/"
 cmake = "3.30.1"
 go    = "1.23.3"
 
+# [system.packages] does not exist in this mise version (GEN-A-8); the
+# installed release (2026.8.6) shipped the same subsystem under
+# [bootstrap.packages] instead. Verified empirically: `mise system --help`
+# fails (no such subcommand), `mise bootstrap packages --help` succeeds.
+[bootstrap.user]
+login_shell = "/usr/bin/zsh"
+
+[bootstrap.packages]
+"dnf:zsh"                 = "latest"
+"dnf:direnv"              = "latest"
+"dnf:fzf"                 = "latest"
+"dnf:the_silver_searcher" = "latest"
+"dnf:kitty"               = "latest"
+"dnf:python3-neovim"      = "latest"
+# Neovim build prerequisites, verbatim from upstream (GEN-A-10)
+"dnf:ninja-build"         = "latest"
+"dnf:gcc"                 = "latest"
+"dnf:make"                = "latest"
+"dnf:gettext"             = "latest"
+"dnf:curl"                = "latest"
+"dnf:glibc-gconv-extra"   = "latest"
+"dnf:git"                 = "latest"
+
+# --manager dnf keeps this scoped: a later task adds flatpak entries to the
+# same [bootstrap.packages] table, and those must not install before the
+# Flathub remote exists.
+# chsh authenticates the target user via PAM, which blocks on a password
+# prompt for a non-root caller; running it via sudo skips that prompt. sudo's
+# secure_path drops $APP_DIR/bin, so PATH must be forwarded explicitly.
+[tasks.packages]
+run = """
+mise bootstrap packages apply --yes --manager dnf
+sudo env "PATH=$PATH" mise bootstrap user apply --yes
+"""
+
 [tasks.all]
+depends = ["packages"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
 [tasks.preview]
 run = """
 mise run --dry-run all
+mise bootstrap packages apply --dry-run --manager dnf
 """
