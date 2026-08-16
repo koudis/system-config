@@ -226,8 +226,40 @@ sed -i "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g"     zsh/zshrc
 sed -i "s|___VIM_BASE_DIR___|${root}/vim|g"              vim/init.vim
 """
 
+# R25 applies here too: a target that already exists and is not a symlink
+# resolving inside this repo is left untouched and the task fails loudly,
+# naming the path (the message is required for correctness, not decorative
+# output). An existing correct symlink is replaced silently, so re-running
+# stays a clean no-op - this is what KITTY-A-1 was missing: the old script
+# linked without replacing and never created the parent directory, so it
+# failed on every second run and on a fresh machine.
+[tasks.link]
+depends = ["render"]
+run = """
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+
+link() {
+    local src="$1" dst="$2"
+    mkdir -p "$(dirname "$dst")"
+    if [[ -e $dst || -L $dst ]]; then
+        if [[ -L $dst ]] && [[ "$(readlink -f "$dst")" == "$root"/* ]]; then
+            ln -sfn "$src" "$dst"
+            return
+        fi
+        echo "link: refusing to replace $dst: not a symlink into this repository" >&2
+        exit 1
+    fi
+    ln -sfn "$src" "$dst"
+}
+
+link "${root}/zsh/zshrc"        "$HOME/.zshrc"
+link "${root}/vim/init.vim"     "$HOME/.config/nvim/init.vim"
+link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
+"""
+
 [tasks.all]
-depends = ["packages", "apps", "tools", "fetch", "nvim", "render"]
+depends = ["packages", "apps", "tools", "fetch", "nvim", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
