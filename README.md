@@ -7,9 +7,13 @@ System config repo to configure basics applications after fresh Linux install.
 
 - CMake
 - [CMakeLib]
+- Go
 - NeoVim
 - ZSH
 - Kitty
+- Desktop applications, installed as Flatpaks from Flathub
+
+One requirements document per entry lives in `docs/requirements/`.
 
 [CMakeLib]: https://github.com/cmakelib/cmakelib
 
