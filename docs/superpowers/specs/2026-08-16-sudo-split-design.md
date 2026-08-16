@@ -34,6 +34,7 @@ Recorded here because each was a fork with a real cost, not a default.
 | Missing prerequisites in the unprivileged phase | Block, naming exactly what is absent | Fail naturally inside the Neovim build; warn and continue |
 | Proof that the unprivileged phase is sudo-free | A second container image with no `sudo` installed | A `sudo` shim on `PATH`; a static grep of task bodies |
 | Flatpak install scope | User scope, so the applications become unprivileged | System scope, keeping the applications in the privileged phase |
+| Flatpak mechanism | The `flatpak` command driven directly from the task body | mise's `flatpak-user` manager and the declarative table |
 | Preflight's command list | Only what the unprivileged tasks execute | The whole resulting environment, including `zsh` and `kitty` |
 | Preflight failure path | Tested, by an expect-fail run on the bare image | Left untested |
 
@@ -98,7 +99,7 @@ The single `[tasks.preview]` splits along the same seam:
 
 ```
 [tasks.preview]         mise run --dry-run all
-                        mise bootstrap packages apply --dry-run --manager flatpak-user
+                        <the application diff described below>
 [tasks.preview-system]  mise run --dry-run system
                         mise bootstrap packages apply --dry-run --manager dnf
 ```
@@ -106,6 +107,21 @@ The single `[tasks.preview]` splits along the same seam:
 This split is load-bearing, not cosmetic: `checks-bootstrap.sh` asserts that
 `mise run preview` succeeds, and that check now runs inside the sudo-less
 image, so `preview` must not reach for dnf.
+
+Driving `flatpak` directly (section 5) costs the free
+`mise bootstrap packages apply --dry-run` that the declarative table would have
+provided, so the application half of the preview is hand-rolled: list what is
+installed in user scope and print the configured identifiers that are absent.
+
+```
+installed=$(flatpak list --user --columns=application)
+for app in $APPS; do
+    grep -qx "$app" <<<"$installed" || echo "would install: $app"
+done
+```
+
+This is the whole of `GEN-R-10` for the application step: it reports what would
+change and changes nothing.
 
 ## 4. Preflight
 
@@ -145,21 +161,32 @@ the privileged phase; its absence otherwise surfaces during the Neovim build.
 Putting an `rpm` call in the unprivileged phase would be the only
 distribution-specific command outside the dnf declarations.
 
-## 5. Flatpak scope
+## 5. Flatpak: user scope, driven directly
 
-The applications move from system scope to user scope. This is what makes
-`flathub` and `apps` unprivileged.
+Two changes, taken together. The applications move from system scope to user
+scope, which is what makes `flathub` and `apps` unprivileged; and they are
+installed by calling `flatpak` from the task body rather than through mise's
+declarative package table.
 
 ```
-sudo flatpak remote-add --if-not-exists flathub ...
-  -> flatpak remote-add --user --if-not-exists flathub ...
+[tasks.flathub]
+depends = ["preflight"]
+run = "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo"
 
-"flatpak:org.kicad.KiCad" = "latest"   (x17)
-  -> "flatpak-user:org.kicad.KiCad" = "latest"
-
-mise bootstrap packages apply --yes --manager flatpak
-  -> mise bootstrap packages apply --yes --manager flatpak-user
+[tasks.apps]
+depends = ["flathub"]
+run = """
+set -euo pipefail
+for app in <the seventeen identifiers>; do
+    flatpak install --user --noninteractive --or-update flathub "$app"
+done
+"""
 ```
+
+`--or-update` is load-bearing, not decoration: a plain `flatpak install` on an
+application that is already present warns and exits non-zero, which would fail
+the second-run requirement (`GEN-R-4`). `--or-update` turns that case into a
+silent no-op update.
 
 The remote and the installations must both be user-scope: a system remote is not
 visible to a `--user` installation. The two therefore move together and cannot
@@ -169,6 +196,37 @@ be split.
 ships with Fedora Workstation while the Flathub remote does not, so on the
 target platform the binary is already present. It stays declared in the
 privileged phase's dnf list as a safety net, and preflight checks for it.
+
+### Why the direct command rather than the declarative table
+
+mise does have a user-scope manager. `flatpak-user` was added in mise
+v2026.8.3, and the pin in this repository is `2026.8.6`, so it is available -
+confirmed against the upstream manager table and the v2026.8.3 release notes.
+The choice is therefore not forced; it is a preference for controlling the
+invocation directly.
+
+What it costs, recorded honestly:
+
+- `APPS-R-5` requires the list to live in the declarative table and **not** in
+  "a separate imperative step with its own wrapper". A `for` loop is exactly
+  that, so `APPS-R-5` is withdrawn and replaced (section 7).
+- The free `--dry-run` that satisfied `GEN-R-10` for the application step is
+  gone and is hand-rolled instead (section 3.4).
+- `mise bootstrap packages status` no longer reports on the applications.
+
+What it buys:
+
+- No dependency on mise's Flatpak manager or its argv choices at all.
+- Explicit control of `--or-update` and `--noninteractive`, which is what makes
+  the step idempotent.
+- `APPS-A-2` stops applying. It recorded that mise *skips* Flatpak entries when
+  the CLI is absent rather than failing, so a fall-through rule would silently
+  install nothing. With the direct command and `flatpak` in preflight's list, an
+  absent CLI now blocks loudly before the step runs.
+
+`flatpak install` writes progress to stdout, and this repository otherwise emits
+no status output. That is accepted here rather than suppressed: this is a
+multi-gigabyte download, and silence during it would be worse than noise.
 
 ### Consequences, stated rather than buried
 
@@ -253,7 +311,15 @@ target is immaterial; `preview` is named because it is the cheapest one.
 ## 7. Requirement changes
 
 Identifiers are never renumbered. Next free numbers verified against the current
-documents: `GEN-R-19`, `APPS-R-10`, `APPS-A-10`.
+documents: `GEN-R-19`, `APPS-R-10`, `APPS-R-11`.
+
+The citation sweep behind this section is `git grep` over every identifier this
+design disturbs, not a reading of the two documents that define them. It found
+four locations that a document-by-document reading missed: the verification
+table in `tool-desktop-apps.md` section 8, the third scope passage at
+`spec-mise-migration.md:491`, the appended-identifier list at
+`requirements/README.md:72-73`, and the `APPS-R-6`/`APPS-A-1` citations in
+`mise.toml`'s own comments.
 
 ### docs/requirements/general.md
 
@@ -273,17 +339,43 @@ documents: `GEN-R-19`, `APPS-R-10`, `APPS-A-10`.
 - `APPS-R-6` (installed system-wide) **marked withdrawn**, number retired.
 - `APPS-R-10` (new): applications SHALL be installed in user scope, so that
   installing them requires no elevation.
+- `APPS-R-5` (the list lives in the declarative table, "not in a separate
+  imperative step with its own wrapper") **marked withdrawn**, number retired.
+  This is the requirement the direct-command decision contradicts head-on.
+- `APPS-R-11` (new): the application identifiers SHALL live in `mise.toml` and
+  nowhere else, so that `GEN-R-7` (one location for every pin and list) still
+  holds once they are no longer in `[bootstrap.packages]`.
+- `APPS-R-9` reworded: it currently requires the application step to follow the
+  remote step "by applying only the Flatpak entries of the shared table". The
+  ordering requirement survives unchanged; the clause about naming the manager
+  at apply time is replaced by the direct invocation.
 - `APPS-R-7` unchanged in intent - an unfiltered Flathub remote must exist
   before any installation is attempted - with the remote now added `--user`.
+- `APPS-A-1` amended: it recorded that the orchestrator's Flatpak manager
+  rejects version pins. That no longer describes the mechanism in use.
+  `APPS-R-1` (no version pinning) is unaffected, because `flatpak` itself
+  exposes no historical-version install either.
+- `APPS-A-2` amended: it recorded that mise lists Flatpak entries as *skipped*
+  when the CLI is absent, so a fall-through would silently install nothing. That
+  failure mode no longer exists here - preflight blocks on an absent `flatpak`.
+  The requirement it justifies (`APPS-R-2`, no runtime fallback chain) stands on
+  its own remaining grounds and is not withdrawn.
 - `APPS-A-4` amended: it recorded that system scope matched the pre-migration
   behaviour. That remains true as a statement about the old setup, and is
   recorded as superseded rather than incorrect.
 - `APPS-A-9` amended: its closing condition currently reads "confirmed installed
   and system-scoped". It becomes "user-scoped".
-- `APPS-A-10` (new): the user-scope manager is named `flatpak-user` and accepts
-  a user-scope remote. **Deliberately carries no validation status** until the
-  container run observes it, per the convention that an unstatused assumption
-  SHALL NOT be relied upon.
+- **Section 8, the verification table** - found by the citation sweep, not by
+  reading the prose. Three rows encode the old behaviour and must change:
+  `APPS-R-6` ("Installed scope is system-wide for all seventeen"), `APPS-R-9`
+  ("applying it names the Flatpak manager only"), and `APPS-A-9` ("confirmed
+  installed and system-scoped"). Rows are added for `APPS-R-10` and `APPS-R-11`,
+  and the withdrawn `APPS-R-5`/`APPS-R-6` rows removed.
+
+No `APPS-A-10` is written. The earlier draft of this design reserved it for the
+`flatpak-user` manager name; driving `flatpak` directly means nothing depends on
+that fact, so recording it as a load-bearing assumption would be false. It is
+kept only as background in section 5.
 
 ### docs/requirements/tool-zsh.md
 
@@ -294,16 +386,31 @@ recording that the elevation is confined to the privileged phase, so
 
 ### docs/requirements/README.md
 
-The paragraph asserting that every assumption is `VERIFIED` and that there are
-no open decisions cites `APPS-A-4` resolving to system-wide. It is rewritten to
-record the scope change, and to list `APPS-A-10` as the one open assumption
-until the harness closes it.
+Two edits, both located by the citation sweep:
+
+- Lines 47-50: the paragraph asserting that every assumption is `VERIFIED` and
+  that there are no open decisions cites `APPS-A-4` resolving to system-wide. It
+  is rewritten to record the scope change. No open assumption replaces it -
+  nothing in this design is unverified once `flatpak` is driven directly.
+- Lines 72-73: the "New identifiers were appended for behaviour that
+  implementation added" list ends with `APPS-R-9` and `APPS-A-9`. `GEN-R-19`,
+  `APPS-R-10` and `APPS-R-11` are appended to it, and the withdrawals of
+  `APPS-R-5` and `APPS-R-6` are recorded alongside the existing corrections.
 
 ### docs/spec-mise-migration.md
 
-The sudo passages at lines 160-167 and 607-608, and the section 6 note that
-both managers' entries share one `[bootstrap.packages]` table - still true, but
-the manager names change.
+Three passages, not two - the third was missed by the original draft of this
+design and found by the citation sweep:
+
+- Lines 160-167: the sudo and `[bootstrap.user]` bullets.
+- Line 491: "**Scope is system-wide** (APPS-R-6), matching current behaviour, so
+  no silent migration of 17 applications between scopes." This is now exactly
+  backwards and must be rewritten, including its rationale.
+- Lines 607-608: `RR6`, the login-shell elevation note.
+
+Also the section 6 note that both managers' entries share one
+`[bootstrap.packages]` table. That stops being true: the table holds `dnf:`
+entries only.
 
 `docs/superpowers/plans/2026-08-15-mise-migration.md` is left untouched, as a
 dated record of an executed plan.
@@ -312,7 +419,7 @@ dated record of an executed plan.
 
 | File | Change |
 |---|---|
-| `mise.toml` | Task split, preflight, flatpak-user, preview split |
+| `mise.toml` | Task split, preflight, direct `flatpak` in user scope, preview split, `APPS-R-6`/`APPS-A-1` comments removed |
 | `README.md` | Two-command install procedure |
 | `test/run.sh` | Third mandatory argument, optional `expect-fail` |
 | `test/Containerfile.nosudo` | New |
@@ -320,36 +427,49 @@ dated record of an executed plan.
 | `test/checks-preflight-missing.sh` | New |
 | `test/checks-apps.sh` | User scope throughout |
 | `docs/requirements/general.md` | `GEN-A-5` amended, `GEN-R-19` added |
-| `docs/requirements/tool-desktop-apps.md` | `APPS-R-6` withdrawn, `APPS-R-10`/`APPS-A-10` added, `APPS-A-4`/`APPS-A-9` amended |
+| `docs/requirements/tool-desktop-apps.md` | `APPS-R-5`/`APPS-R-6` withdrawn, `APPS-R-10`/`APPS-R-11` added, `APPS-R-9` reworded, `APPS-A-1`/`A-2`/`A-4`/`A-9` amended, section 8 verification table updated |
 | `docs/requirements/tool-zsh.md` | `ZSH-A-8`/`ZSH-A-9` scoping note |
-| `docs/requirements/README.md` | Open-assumption list |
-| `docs/spec-mise-migration.md` | Sudo and manager-name passages |
+| `docs/requirements/README.md` | Corrections paragraph and appended-identifier list |
+| `docs/spec-mise-migration.md` | Three sudo/scope passages and the shared-table note |
 
 `test/Containerfile` and `test/checks-packages.sh` are unchanged.
 
 ## 9. Risk and rollback
 
-**The one open dependency is `APPS-A-10`.** `flatpak-user` as a manager name is
-asserted in a comment at `mise.toml:59` but has never been observed, and mise is
-not installed on the development host. It is confirmed or disproved by the first
-container run of the `apps` check.
+Driving `flatpak` directly removed this design's only unverified dependency. The
+earlier draft rested on mise's `flatpak-user` manager existing; nothing does
+now. What remains are three bounded risks.
 
-If it is disproved - the manager does not exist under that name, or will not
-accept a user-scope remote - the fallback is bounded and does not invalidate the
-rest of this design:
+**Idempotence of the application step.** `flatpak install --or-update` is
+asserted to be a silent no-op on an already-installed application, which is what
+`GEN-R-4` requires of a second run. This is the one behaviour in the design that
+the harness must actually demonstrate rather than infer, and `test/run.sh`
+already runs every target twice, so the existing structure proves it.
 
-- `APPS-R-6` is not withdrawn; `APPS-R-10` and `APPS-A-10` are not added.
-- `[tasks.flathub]` and `[tasks.apps]` move back into `[tasks.system]`, keeping
-  their `sudo` and their system scope.
-- `flatpak` leaves preflight's list.
-- `checks-apps.sh` keeps `--system` and runs on the privileged image.
-- Sections 3 (minus the two tasks), 4, 6 and the `GEN-R-19` half of section 7
-  are unaffected. `./setup` is still sudo-free; desktop applications simply
-  require `./setup system`.
+If `--or-update` turns out not to be sufficient, the fallback is to test
+membership first and skip:
 
-A second, smaller risk: `APPS-A-9` already records that the harness never
-exercises a real installation, only resolvability. That gap is unchanged by this
-design and is still closed only by the first run on a real machine.
+```
+installed=$(flatpak list --user --columns=application)
+grep -qx "$app" <<<"$installed" || flatpak install --user --noninteractive flathub "$app"
+```
+
+**The hand-rolled preview.** `GEN-R-10` is satisfied by a diff rather than by a
+supported `--dry-run`, so it can drift from what the install step actually does.
+The mitigation is that both read the same identifier list in the same file.
+
+**`APPS-A-9`, unchanged.** It already records that the harness never exercises a
+real installation, only resolvability. This design does not close that gap; it
+is still closed only by the first run on a real machine.
+
+If the direct command proves unworkable altogether, the ordered fallbacks are:
+first mise's `flatpak-user` manager (verified to exist at this pin, restoring
+`APPS-R-5` and needing no elevation); and only then reverting to system scope,
+which puts `flathub` and `apps` back in `[tasks.system]`, restores `APPS-R-6`,
+drops `flatpak` from preflight's list, and returns `checks-apps.sh` to
+`--system` on the privileged image. Sections 3 (minus the two tasks), 4, 6 and
+the `GEN-R-19` half of section 7 survive either fallback: `./setup` is still
+sudo-free, and only the desktop applications would require `./setup system`.
 
 ## 10. Success criteria
 
@@ -364,4 +484,9 @@ design and is still closed only by the first run on a real machine.
 5. Both `mise run preview` and `mise run preview-system` succeed, `preview` in
    the sudo-less image.
 6. Every check set passes on a second consecutive run, unchanged (idempotence,
-   `GEN-R-4`).
+   `GEN-R-4`). For `apps` this is the specific proof that
+   `flatpak install --or-update` is a no-op on an already-installed
+   application.
+7. `git grep` finds no surviving citation of the withdrawn `APPS-R-5` or
+   `APPS-R-6` outside the withdrawal notices themselves and the dated plan
+   record.
