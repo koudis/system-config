@@ -102,12 +102,12 @@ Consequences:
 - The Go SDK moves from its hardcoded path into the same directory, installed
   rather than assumed.
 - Fetched *runtime content* (ohmyzsh, cmakelib) stays in the repository under
-  `vendor/`, gitignored. It is read at runtime, not installed. The one
+  `_vendor/`, gitignored. It is read at runtime, not installed. The one
   exception is zsh-autosuggestions, which is fetched to
   `zsh/custom/plugins/zsh-autosuggestions` - also inside the repository, also
   gitignored - because Oh My Zsh resolves custom plugins only under
   `$ZSH_CUSTOM/plugins/` (ZSH-A-7, ZSH-R-12). Fetching it to its real load path
-  is preferred over fetching it to `vendor/` and adding a symlink.
+  is preferred over fetching it to `_vendor/` and adding a symlink.
 - Fetched *build inputs* (Neovim, CMake sources) land in `<repo>/.build`,
   gitignored, and are scratch.
 - Deleting the application directory and re-running setup restores a working
@@ -352,7 +352,7 @@ pin, so an explicit ref must be recorded or these silently start tracking
 
 `cmconf` is the currently-orphaned gitlink; it is declared properly here.
 zsh-autosuggestions is fetched to `zsh/custom/plugins/zsh-autosuggestions`
-rather than to `vendor/`, for the reason given in section 4.
+rather than to `_vendor/`, for the reason given in section 4.
 
 **Fetching never destroys a path it did not create** (GEN-R-17, GEN-R-17a).
 The fetch step refuses, without deleting, if the target path is a registered
@@ -399,7 +399,7 @@ deleted (ZSH-R-4).
 
 `ZSH_CUSTOM` gets its own template placeholder, `___ZSH_CUSTOM_DIR___`
 (ZSH-R-14). It cannot share the framework-path placeholder: the framework is
-fetched runtime content under `vendor/` while the custom directory is committed
+fetched runtime content under `_vendor/` while the custom directory is committed
 repository content under `zsh/`, and one placeholder cannot yield two unrelated
 roots.
 

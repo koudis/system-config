@@ -61,7 +61,7 @@ kept their numbers:
   `[bootstrap.user].login_shell` for the login shell. The names this set
   originally recorded do not exist in mise 2026.8.6.
 - `ZSH-R-12` - zsh-autosuggestions is fetched to
-  `zsh/custom/plugins/zsh-autosuggestions`, not under `vendor/`.
+  `zsh/custom/plugins/zsh-autosuggestions`, not under `_vendor/`.
 - `KITTY-R-3` / `KITTY-R-4` - deployment replaces only a symbolic link that
   already points into this repository, and refuses anything else, rather than
   replacing whatever it finds.

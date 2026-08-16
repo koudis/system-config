@@ -37,9 +37,9 @@ the plugin failing to load from any other location.
 
 **ZSH-R-12** The autosuggestions plugin SHALL therefore be fetched directly to
 `zsh/custom/plugins/zsh-autosuggestions`, its real load path, and SHALL NOT be
-placed under `vendor/` with a symbolic link pointing at it. This is a
+placed under `_vendor/` with a symbolic link pointing at it. This is a
 correction to an earlier formulation that grouped it with the other fetched
-runtime content under `vendor/`; the intent of that formulation - fetched
+runtime content under `_vendor/`; the intent of that formulation - fetched
 runtime content lives inside the repository and is never committed - is
 unchanged, and the path is ignored by git like the rest of it.
 
