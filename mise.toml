@@ -274,7 +274,11 @@ render() {
         -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
         -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
         "$template" > "$new"
-    if [[ -e $out ]] && cmp -s "$new" "$out"; then
+    # sha256sum, not cmp: cmp ships in diffutils, which a minimal Fedora
+    # install does not have, and a comparison that errors out would refuse
+    # every run - including the identical-content one that has to stay a
+    # no-op. sha256sum is coreutils, so it is always there.
+    if [[ -e $out ]] && [[ "$(sha256sum < "$new")" == "$(sha256sum < "$out")" ]]; then
         rm -f "$new"
         return
     fi
