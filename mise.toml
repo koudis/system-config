@@ -163,20 +163,33 @@ fetch_pinned vendor/cmakelib-component-cmutil  https://github.com/cmakelib/cmake
 fetch_pinned vendor/cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
 """
 
-# Freshness keys on a version stamp file, not the source tree (mise has open
-# upstream bugs where sources/outputs freshness misfires with multiple
-# outputs or deleted sources) - exactly one source, one output. The stamp
-# carries APP_DIR as well as NVIM_VERSION so that changing the install
-# prefix invalidates a previous build rather than leaving a stale binary at
-# the old prefix.
+# A task gated by its own sources/outputs cannot be the one writing its
+# source: the write only happens once mise has already decided to run the
+# task, so the file mise compares against never reflects a version bump
+# ahead of that decision (R27). This ungated task always runs first and
+# rewrites the stamp from the current env; source_freshness_hash_contents
+# (see [settings.task] above) means an unchanged NVIM_VERSION/APP_DIR
+# reproduces byte-identical content, so [tasks.nvim]'s freshness gate below
+# still sees "unchanged" and skips - only an actual pin or prefix change
+# changes the hash and forces a rebuild.
+[tasks.nvim-stamp]
+run = """
+mkdir -p .build
+printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
+"""
+
+# Freshness keys on the version stamp above, not the source tree (mise has
+# open upstream bugs where sources/outputs freshness misfires with multiple
+# outputs or deleted sources) - exactly one source, one output. Invalidation
+# on a prefix change also has a second, independent cause: outputs is
+# templated with {{env.APP_DIR}}, so a new prefix names a path that does not
+# exist yet, which mise treats as not-fresh regardless of the stamp.
 [tasks.nvim]
-depends = ["tools", "packages"]
+depends = ["tools", "packages", "nvim-stamp"]
 sources = [".build/nvim.version"]
 outputs = ["{{env.APP_DIR}}/bin/nvim"]
 run = """
 set -euo pipefail
-mkdir -p .build
-printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
 src=".build/neovim-${NVIM_VERSION}"
 if [[ ! -d $src ]]; then
     curl -fsSL "https://github.com/neovim/neovim/archive/refs/tags/${NVIM_VERSION}.tar.gz" \
