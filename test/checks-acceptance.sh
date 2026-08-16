@@ -16,18 +16,25 @@ assert_cmd "no .gitmodules" test ! -f .gitmodules
 assert_cmd "no legacy scripts" \
     bash -c '[[ -z $(git ls-files "*/setup.sh" "*/install_deps.sh" lib.sh setup.sh) ]]'
 
+# Every content grep below excludes this file. `git grep` searches tracked
+# files, and the patterns being searched for are spelled out here verbatim, so
+# an included check file matches its own regex and reports a violation that
+# does not exist. Two of the three are currently out of scope anyway by their
+# narrower pathspecs; they carry the exclusion so that widening a pathspec
+# later cannot silently reintroduce the self-match.
+
 # Criterion 14 says "anywhere in the repository", so this scans every tracked
 # file rather than mise.toml and ./setup alone - the conditionals it has to
 # catch lived in the shell scripts, which those two patterns never covered.
 # docs/ is excluded because the requirement documents necessarily quote the
 # constructs they forbid.
 assert_cmd "no OS conditionals" \
-    bash -c '! git grep -qiE "OS_NAME|if debian|apt install" -- ":!docs/"'
+    bash -c '! git grep -qiE "OS_NAME|if debian|apt install" -- ":!docs/" ":!test/checks-acceptance.sh"'
 
 assert_cmd "no hardcoded username" \
-    bash -c '! git grep -q "/home/h" -- "*/template/*" "*.toml"'
+    bash -c '! git grep -q "/home/h" -- "*/template/*" "*.toml" ":!test/checks-acceptance.sh"'
 assert_cmd "no ssh urls" \
-    bash -c '! git grep -q "git@github.com" -- "*.toml" setup'
+    bash -c '! git grep -q "git@github.com" -- "*.toml" setup ":!test/checks-acceptance.sh"'
 
 assert_cmd "every tool has a requirements document" \
     bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps; do

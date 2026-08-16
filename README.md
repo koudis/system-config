@@ -32,4 +32,3 @@ A single task can be run on its own by naming it, for example `./setup link`.
 To add a tool, follow [docs/adding-a-new-tool.md](docs/adding-a-new-tool.md).
 
 [mise]: https://mise.jdx.dev
- 
