@@ -104,14 +104,44 @@ sudo flatpak remote-add --if-not-exists flathub \
 depends = ["flathub"]
 run = "mise bootstrap packages apply --yes --manager flatpak"
 
+# The unprivileged phase's system prerequisites. Blocking here rather than
+# letting the Neovim build fail on a missing compiler is the same
+# refuse-and-name-the-path answer the fetch, render and link guards give: the
+# message is the only thing that tells the user the privileged phase was never
+# run. Silent on success.
+#
+# The list gates what the tasks execute and nothing else. git and curl are used
+# by setup, fetch and the Neovim download; gcc, make, ninja and msgfmt by the
+# Neovim build; flatpak by flathub and apps. glibc-gconv-extra ships no binary
+# and cannot be command-checked, so it stays asserted by rpm -q in the
+# privileged phase's checks and otherwise surfaces during the build.
+# mise templates run scripts with Tera before handing them to the shell, so
+# the usual ${#missing[@]} length check is unusable here: the literal `{#`
+# reads as an unclosed Tera comment opener and fails task validation before
+# bash ever sees the script. An emptiness test on ${missing[*]-} sidesteps it.
+[tasks.preflight]
+run = """
+set -euo pipefail
+missing=()
+for c in git curl gcc make ninja msgfmt flatpak; do
+    command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+done
+if [[ -n "${missing[*]-}" ]]; then
+    echo "preflight: missing required commands: ${missing[*]}" >&2
+    echo "preflight: these come from the privileged half" >&2
+    echo "preflight: run './setup system' first, or install them yourself" >&2
+    exit 1
+fi
+"""
+
 # Decorative by mise's design, kept deliberately: mise installs everything in
 # [tools] before it runs any task at all, so `mise install` here has nothing
-# left to do and depends = ["packages"] gates nothing - `./setup fetch` on a
+# left to do and depends = ["preflight"] gates nothing - `./setup fetch` on a
 # fresh box downloads both SDKs on the way to fetching. Removing the task would
 # leave no way to ask for the SDK step alone, which is what [tasks.all] and the
 # harness (`test/run.sh tools tools`) name, so it stays as that entry point.
 [tasks.tools]
-depends = ["packages"]
+depends = ["preflight"]
 run = "mise install"
 
 [tasks.fetch]
@@ -216,7 +246,7 @@ printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
 # templated with {{env.APP_DIR}}, so a new prefix names a path that does not
 # exist yet, which mise treats as not-fresh regardless of the stamp.
 [tasks.nvim]
-depends = ["tools", "packages", "nvim-stamp"]
+depends = ["tools", "preflight", "nvim-stamp"]
 sources = [".build/nvim.version"]
 outputs = ["{{env.APP_DIR}}/bin/nvim"]
 run = """
