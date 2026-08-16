@@ -80,14 +80,25 @@ login_shell = "/usr/bin/zsh"
 # --manager dnf keeps this scoped: the apps task below applies the flatpak
 # entries from the same [bootstrap.packages] table, and those must not
 # install before the Flathub remote exists.
+[tasks.packages]
+run = "mise bootstrap packages apply --yes --manager dnf"
+
 # chsh authenticates the target user via PAM, which blocks on a password
 # prompt for a non-root caller; running it via sudo skips that prompt. sudo's
 # secure_path drops $APP_DIR/bin, so PATH must be forwarded explicitly.
-[tasks.packages]
-run = """
-mise bootstrap packages apply --yes --manager dnf
-sudo env "PATH=$PATH" mise bootstrap user apply --yes
-"""
+# This is the only literal sudo in this file (GEN-R-19); mise elevates on its
+# own for the dnf apply above.
+# depends = ["packages"]: mise runs independent dependencies of [tasks.system]
+# in parallel, and chsh here targets /usr/bin/zsh, which only exists once the
+# dnf apply in packages has installed it. Without this, the two tasks race.
+[tasks.login-shell]
+depends = ["packages"]
+run = 'sudo env "PATH=$PATH" mise bootstrap user apply --yes'
+
+# The privileged phase. Everything reachable from here may elevate; nothing
+# outside it may (GEN-R-19).
+[tasks.system]
+depends = ["packages", "login-shell"]
 
 # mise does not create flatpak remotes (APPS-A-5), so this is an explicit
 # preceding step. Adding the remote manually (rather than via Fedora's
@@ -359,7 +370,7 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["packages", "apps", "tools", "fetch", "nvim", "render", "link"]
+depends = ["preflight", "apps", "tools", "fetch", "nvim", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
