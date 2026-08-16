@@ -22,6 +22,7 @@ podman run --rm -i \
         echo '--- second run (idempotence) ---'
         ./setup ${TARGET}
         export APP_DIR=\"\${APP_DIR:-\$HOME/App}\"
+        export MISE_DATA_DIR=\"\$APP_DIR/mise\"
         PATH=\"\$APP_DIR/bin:\$PATH\"
         command -v mise >/dev/null && eval \"\$(mise env -s bash)\"
         source test/assert.sh
