@@ -163,8 +163,40 @@ fetch_pinned vendor/cmakelib-component-cmutil  https://github.com/cmakelib/cmake
 fetch_pinned vendor/cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
 """
 
+# Freshness keys on a version stamp file, not the source tree (mise has open
+# upstream bugs where sources/outputs freshness misfires with multiple
+# outputs or deleted sources) - exactly one source, one output. The stamp
+# carries APP_DIR as well as NVIM_VERSION so that changing the install
+# prefix invalidates a previous build rather than leaving a stale binary at
+# the old prefix.
+[tasks.nvim]
+depends = ["tools", "packages"]
+sources = [".build/nvim.version"]
+outputs = ["{{env.APP_DIR}}/bin/nvim"]
+run = """
+set -euo pipefail
+mkdir -p .build
+printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
+src=".build/neovim-${NVIM_VERSION}"
+if [[ ! -d $src ]]; then
+    curl -fsSL "https://github.com/neovim/neovim/archive/refs/tags/${NVIM_VERSION}.tar.gz" \
+      | tar -xz -C .build
+    mv ".build/neovim-${NVIM_VERSION#v}" "$src"
+fi
+cd "$src"
+# CMAKE_PRG, not CMAKE_PROGRAM: Neovim's Makefile only recognises CMAKE_PRG
+# (defaults to a bare `cmake` on PATH otherwise, silently bypassing the
+# pinned cmake installed under $APP_DIR by the tools task). mise puts the
+# [tools]-declared cmake on PATH for task execution, so command -v resolves
+# to the pinned mise-managed cmake rather than any system copy.
+make CMAKE_BUILD_TYPE=RelWithDebInfo \
+     CMAKE_INSTALL_PREFIX="$APP_DIR" \
+     CMAKE_PRG="$(command -v cmake)"
+make CMAKE_INSTALL_PREFIX="$APP_DIR" install
+"""
+
 [tasks.all]
-depends = ["packages", "apps", "tools", "fetch"]
+depends = ["packages", "apps", "tools", "fetch", "nvim"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
