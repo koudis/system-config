@@ -12,7 +12,7 @@
 
 ## Status and corrections to this plan
 
-Tasks 1 through 9 are implemented and reviewed. **Task 10 is paused by an explicit decision and has not run**: the 14 legacy shell scripts, `.gitmodules` and all 9 submodules are still present in the working tree.
+All ten tasks are implemented and reviewed. **Task 10 has run**: the 14 legacy shell scripts, `.gitmodules`, all 9 submodule gitlinks and the `.git/modules` object stores are removed from the working tree.
 
 Four things this plan got wrong were corrected during execution. They are fixed in place below, and are listed here because the plan text is otherwise the record of what was intended:
 
@@ -915,7 +915,7 @@ git commit -m "feat: deploy configuration symlinks idempotently"
 
 Only after Task 9 passes. This is the destructive task and is deliberately last and separate, so it reverts cleanly.
 
-**Not run. Paused by an explicit decision.** Everything this task deletes is still present: the 14 legacy shell scripts, `lib.sh`, `.gitmodules`, and all 9 gitlinks including the orphaned `cmakelib-component-cmconf`. Two submodule checkouts currently carry uncommitted changes. Two consequences follow while that holds. First, the fetch task's refusal to touch a registered submodule (Task 6) is the only thing standing between a `./setup fetch` on the real machine and a live submodule checkout, so it is load-bearing rather than theoretical. Second, `zsh/setup.sh` is broken from Task 8 onward, because it still references the `zsh/template/config_template` that Task 8 deleted and the placeholders it removed; this task owns that breakage.
+**Run and complete.** Everything listed below is deleted: the 14 legacy shell scripts, `lib.sh`, `.gitmodules`, and all 9 gitlinks including the orphaned `cmakelib-component-cmconf`, plus the `.git/modules` object stores. The two submodule checkouts that carried local work were confirmed pushed to their remotes first (`cmakelib-component-cmutil` at `ea9a5dc`, on `refs/heads/BAF-1402/parse-version-file`), and the dirty `zsh/ohmyzsh` theme was confirmed byte-identical to the copy Task 8 committed. Two consequences of the pause are resolved: the fetch task's refusal to touch a registered submodule (Task 6) now guards a re-introduced gitlink rather than a live one, and the `zsh/setup.sh` broken from Task 8 onward - it referenced the `zsh/template/config_template` Task 8 deleted - is gone.
 
 **Files:**
 - Delete: `setup.sh`, `lib.sh`

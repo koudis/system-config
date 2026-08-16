@@ -3,7 +3,8 @@
 
 Flatpack packages to be installed.
 
-For list of SW to be installed confront `setup.sh`.
+For the list of SW to be installed confront the `flatpak:` entries in
+`[bootstrap.packages]` in `mise.toml`.
 
 Software which could be usefull
 

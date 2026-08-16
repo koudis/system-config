@@ -15,16 +15,21 @@ System config repo to configure basics applications after fresh Linux install.
 
 ## Build and Install
 
-Each tool is compiled, setup and installed separately by a `setup.sh <tools_name>` script.
-
-The script install all dependencies to ~/Bin directory.
-
-The toolname is a name of the containing directory in the git root.
-
-For exmaple install Neovim run
-
 ```bash
-./setup.sh vim
+./setup
 ```
 
-## 
+That is the whole procedure. `./setup` installs [mise] if it is missing and
+then runs every task declared in `mise.toml`. Running it a second time changes
+nothing.
+
+Everything is installed under `$APP_DIR`, which defaults to `~/App`. Export a
+different `APP_DIR` before running to install somewhere else.
+
+A single task can be run on its own by naming it, for example `./setup link`.
+`./setup preview` reports what a run would change without changing it.
+
+To add a tool, follow [docs/adding-a-new-tool.md](docs/adding-a-new-tool.md).
+
+[mise]: https://mise.jdx.dev
+ 

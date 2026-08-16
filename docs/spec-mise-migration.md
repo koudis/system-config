@@ -317,9 +317,9 @@ The fetch step refuses, without deleting, if the target path is a registered
 submodule of this repository or a git work tree with uncommitted changes, and
 it fails naming the path. The refusal covers `checkout --force` as well as
 `rm -rf`, because a forced checkout discards uncommitted work just as
-effectively. This matters concretely while the migration is incomplete: the
-submodules are still present in the working tree, and two of them are dirty, so
-an ordering assumption is not a safeguard. A clean clone already at the pinned
+effectively. The submodules have since been removed (section 9), so the
+refusal now guards a re-introduced gitlink or a dirty plain clone rather than
+the checkouts that were live while the migration ran. A clean clone already at the pinned
 ref is reused in place and not re-fetched, which is also what keeps the step a
 no-op on a second run.
 
@@ -495,16 +495,16 @@ Separate, revertable commits:
 5. Delete the 14 shell scripts and `lib.sh`.
 6. Commit `zsh/custom/themes/muse.zsh-theme`, delete `muse_theme.patch`.
 
-**Status.** Steps 1, 2, 3 and 6 are done, in that order, task by task through
-the containerised harness. Steps 4 and 5 - the removal of the submodules and of
-the legacy shell scripts - are **paused by an explicit decision and have not
-run**: all 9 gitlinks, `.gitmodules` and all 14 shell scripts are still present
-in the working tree, and two submodule checkouts are dirty. Nothing in these
-documents should be read as asserting otherwise. Two consequences follow while
-that remains true: the fetch step's refusal to touch a registered submodule
-(6.2) is load-bearing rather than theoretical, and `zsh/setup.sh` is broken,
-because it still references the deleted `zsh/template/config_template` and the
-removed placeholders. Both are resolved by steps 4 and 5 when they run.
+**Status.** All six steps are done, in that order, task by task through the
+containerised harness. Steps 4 and 5 removed all 9 gitlinks - including the
+orphaned `cmakelib-component-cmconf` - `.gitmodules`, the submodule object
+stores under `.git/modules`, and all 14 shell scripts. `git ls-files -s`
+reports no mode-160000 entry and `git submodule status` reports nothing. The
+two consequences that held while the removal was pending are resolved: the
+broken `zsh/setup.sh`, which still referenced the `zsh/template/config_template`
+deleted in step 6, is gone with the rest. The fetch step's refusal to touch a
+registered submodule (6.2) now guards only a re-introduced one, so it is a
+regression guard rather than a live safeguard, and it is retained as such.
 
 ## 10. Acceptance criteria
 

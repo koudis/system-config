@@ -7,12 +7,10 @@ Tools used:
 - wd
 - fzf
 
-Tools are installed by install_deps script during the configuration.
+Tools are declared in `[bootstrap.packages]` in `mise.toml` and installed by
+`./setup`.
 
 ## How to configure
 
-- Run
-  ```bash
-  <git_root>/setup.sh zsh
-  ```
-- Do not forget to change login shell to zsh by `chsh` command
+Run `./setup` from the repository root. It renders `zshrc`, links it into
+`$HOME` and sets zsh as the login shell; no manual `chsh` is needed.
