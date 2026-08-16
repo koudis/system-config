@@ -8,6 +8,11 @@ TARGET="${2:?$USAGE}"
 # No default mode either, for the same reason the target has none: a silently
 # defaulted image would let a check pass against the wrong machine.
 MODE="${3:?$USAGE}"
+EXPECT="${4:-}"
+if [ -n "$EXPECT" ] && [ "$EXPECT" != expect-fail ]; then
+    echo "test/run.sh: fourth argument must be expect-fail if given, got '$EXPECT'" >&2
+    exit 1
+fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 case "$MODE" in
@@ -27,6 +32,7 @@ podman run --rm -i \
     --security-opt label=disable \
     --userns=keep-id \
     -v "${REPO_ROOT}:/home/tester/repo:ro" \
+    -e EXPECT_FAIL="$EXPECT" \
     "$IMAGE" bash -lc "
         set -euo pipefail
         # A clone, not 'cp -r': the harness must test what is committed. A
@@ -40,9 +46,23 @@ podman run --rm -i \
         # enough. Uncommitted edits to tracked files are dropped on purpose.
         git clone --quiet --no-hardlinks /home/tester/repo /home/tester/work
         cd /home/tester/work
-        ./setup ${TARGET}
-        echo '--- second run (idempotence) ---'
-        ./setup ${TARGET}
+        if [ \"\$EXPECT_FAIL\" = expect-fail ]; then
+            # One run, not two: a failing setup has no second run to compare
+            # for idempotence.
+            if ./setup ${TARGET} >/tmp/setup.log 2>&1; then
+                echo 'FAIL  setup succeeded but expect-fail was requested'; exit 1
+            fi
+            grep -q 'missing required commands' /tmp/setup.log || {
+                echo 'FAIL  setup failed without the preflight message'
+                cat /tmp/setup.log
+                exit 1
+            }
+            echo 'PASS  setup failed with the preflight message'
+        else
+            ./setup ${TARGET}
+            echo '--- second run (idempotence) ---'
+            ./setup ${TARGET}
+        fi
         export APP_DIR=\"\${APP_DIR:-\$HOME/App}\"
         # Mirrors ./setup's own MISE_DATA_DIR export (GEN-A-7): ./setup ran as a
         # child process above, so that export never reached this parent shell.
