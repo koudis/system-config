@@ -108,15 +108,45 @@ set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
 mkdir -p vendor zsh/custom/plugins
 
-# Re-fetches only when the work tree isn't already at the pinned ref, so a
-# second run touches the network for nothing (idempotence).
+# R25: never destroy a directory this task did not create. A registered
+# submodule gitlink, or any uncommitted local changes, stop the task with a
+# non-zero exit and a message naming the path instead of touching it.
+refuse_if_submodule() {
+    local dir="$1"
+    if git ls-files -s -- "$dir" 2>/dev/null | grep -q '^160000'; then
+        echo "fetch: refusing to touch $dir: registered as a git submodule" >&2
+        exit 1
+    fi
+}
+refuse_if_dirty() {
+    local dir="$1"
+    # -e "$dir/.git", not `git -C "$dir" rev-parse --is-inside-work-tree`:
+    # the latter walks up to the enclosing repo's .git for any plain
+    # subdirectory that lacks its own, silently pointing every subsequent
+    # git command at the wrong (outer) repository instead of failing.
+    if [[ -e $dir/.git ]] && [[ -n $(git -C "$dir" status --porcelain 2>/dev/null) ]]; then
+        echo "fetch: refusing to touch $dir: uncommitted changes present" >&2
+        exit 1
+    fi
+}
+
+# Re-fetches only when the work tree isn't already at the pinned ref. The
+# ref is resolved locally first (works for SHA pins and tag pins alike) so
+# an up-to-date clone touches the network for nothing (idempotence). A path
+# that already has its own .git (a plain clone, or a submodule gitlink such
+# as the pre-existing zsh-autosuggestions checkout, R9) is reused in place
+# and never deleted, even when its ref does not yet match.
 fetch_pinned() {
     local dir="$1" url="$2" ref="$3"
-    if [[ ! -d $dir/.git ]]; then
+    if [[ ! -e $dir/.git ]]; then
+        [[ -e $dir ]] && refuse_if_submodule "$dir"
         rm -rf "$dir"
         git clone --quiet "$url" "$dir"
     fi
-    if [[ $(git -C "$dir" rev-parse HEAD) != "$ref" ]]; then
+    local target
+    target=$(git -C "$dir" rev-parse --verify --quiet "${ref}^{commit}" 2>/dev/null || true)
+    if [[ -z $target || $target != $(git -C "$dir" rev-parse HEAD) ]]; then
+        refuse_if_dirty "$dir"
         git -C "$dir" fetch --quiet --tags origin
         git -C "$dir" checkout --quiet --force "$ref"
     fi
