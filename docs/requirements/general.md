@@ -70,6 +70,10 @@ configurable (GEN-R-1b) and it is not inside the repository.
 setup. Installed artifacts are machine-local, disposable, and reproducible from
 the pins; they are never committed.
 
+**GEN-D-15 Entry point.** The single executable at the repository root that
+prepares the environment the orchestrator reads at process start (GEN-A-7) and
+then invokes the orchestrator. It is the only supported way to run setup.
+
 ---
 
 ## 2. The classification rule
@@ -93,7 +97,11 @@ content. A downloaded tarball that is compiled and discarded is a build input.
 ## 3. Global assumptions
 
 Each assumption records its validation status. `VERIFIED` means checked against
-an authoritative upstream source or against this machine on 2026-08-15.
+an authoritative upstream source, against this machine on 2026-08-15, or against
+the pinned orchestrator release (mise 2026.8.6) during implementation on
+2026-08-15 and 2026-08-16. Where an assumption was written from documentation
+and later contradicted by the pinned binary, the observation wins and the
+assumption records what was observed.
 
 **GEN-A-1 Single user, single machine.** One user account, one laptop
 configured at a time. No multi-machine divergence, no shared state, no secrets
@@ -128,12 +136,34 @@ cannot be set from within the orchestrator's own configuration. A wrapper must
 export it. `VERIFIED` - upstream environments documentation states this
 explicitly.
 
-**GEN-A-8 System-package support in the orchestrator is experimental.** The
-declarative system-package subsystem is gated behind an experimental flag and
-is mid-rename upstream. The orchestrator's own FAQ additionally states it is
-"for dev tools, not applications or system packages", which predates the
-feature. This tension is real and unresolved upstream. `VERIFIED - CAVEATED`.
-See GEN-R-11.
+**GEN-A-8 System-package support in the orchestrator is experimental, and the
+rename has already happened.** The declarative system-package subsystem is
+gated behind an experimental flag. An earlier draft of these documents recorded
+the interface as a `packages` table under a `system` table, applied by an
+`install` subcommand beneath a `system` command group. That interface does not
+exist in the pinned release. `VERIFIED - observed against mise 2026.8.6`: `mise system --help`
+errors out because there is no `system` subcommand, `system` does not appear in
+the top-level command list, and `mise bootstrap packages --help` succeeds. The
+observation was made independently three times against the real binary, and it
+outranks the documentation the earlier draft was written from. The interface in
+use is therefore:
+
+| Element | Value |
+|---|---|
+| Package table | `[bootstrap.packages]`, keyed `manager:package` |
+| Apply command | `mise bootstrap packages apply --yes --manager <manager>` |
+| Preview | the same command with `--dry-run` in place of `--yes` |
+| Login-shell table | `[bootstrap.user]`, key `login_shell` |
+
+The orchestrator's own FAQ additionally states it is "for dev tools, not
+applications or system packages", which predates the feature. That tension is
+real and unresolved upstream. See GEN-R-11.
+
+**GEN-A-8a Package managers share one table.** Both the distribution-package
+entries and the Flatpak entries live in the single `[bootstrap.packages]`
+table, because TOML forbids a duplicate table header. They are separated at
+apply time by `--manager`, not by declaration site. `VERIFIED` - observed while
+implementing the packages and apps tasks.
 
 **GEN-A-9 Flathub is not guaranteed to be configured.** Flatpak itself ships
 with Fedora Workstation, but the Flathub remote is opt-in through Third-Party
@@ -146,6 +176,24 @@ package description.
 Fedora installation does not carry the toolchain needed to build the build
 inputs. Prerequisites SHALL be declared per tool, not assumed. `VERIFIED` -
 see the Neovim document.
+
+**GEN-A-11 The tool-install location is read by every process, not only by
+setup.** GEN-A-7 is not specific to the entry point. An ordinary interactive
+login shell that activates the orchestrator without first exporting the
+variable falls back to the orchestrator's default data directory, which is
+outside the application directory and therefore breaks containment (GEN-D-12,
+GEN-R-1a). `VERIFIED` - observed in a clean interactive shell during
+implementation: with the exports present the orchestrator's own diagnostic
+reports the data directory under the application directory, and installs
+resolve there.
+
+**GEN-A-12 A freshness stamp cannot be written inside the task it gates.** A
+task whose freshness is decided by comparing a stamp file it writes itself can
+never be invalidated by a change to that stamp: the write happens only after
+the orchestrator has already decided to run the task, so the file the
+orchestrator compares against never reflects a pin change ahead of that
+decision. `VERIFIED` - observed while implementing the Neovim build; a version
+bump did not trigger a rebuild until the write was moved out.
 
 ---
 
@@ -213,6 +261,19 @@ by definition dead code. Package names are declared for Fedora only.
 by adding a declaration mechanism in one shared place, never by reintroducing
 per-tool conditionals - which is the pattern GEN-A-2 was adopted to remove.
 
+**GEN-R-8b** A guard on the existence of a command is **not** an
+operating-system conditional and is not prohibited by GEN-R-8. GEN-R-8 targets
+branching on the operating system or on the environment, which is dead code
+under GEN-A-2. A command-existence guard branches on whether setup has run yet,
+which is a real and recurring state on the machine this repository exists to
+bootstrap: a fresh notebook, a restored set of dotfiles, or a deleted
+application directory all produce a login shell that starts before the
+orchestrator exists. Such a guard MAY be used where the absent command would
+otherwise produce an error on every shell start or every harness run. The
+repository uses the idiom in three places: the entry point before installing
+the orchestrator, the verification harness before sourcing the orchestrator's
+environment, and the rendered login-shell profile before activating it.
+
 **GEN-R-9** A tool SHALL NOT configure another tool. Any value one tool needs
 from another SHALL be an explicitly declared input, not an incidental side
 effect of the other tool's setup.
@@ -237,6 +298,53 @@ directory, named `tool-<name>.md`.
 SHALL be sourced from the upstream project or from Fedora's own package index,
 not inferred from a binary name.
 
+### The entry point
+
+**GEN-R-15** The entry point (GEN-D-15) SHALL forward its arguments unchanged
+to the orchestrator's task runner and SHALL default to the aggregate task
+`all` when given none. Running a single task SHALL therefore be possible
+without bypassing the entry point, which is the only place the process-start
+environment (GEN-A-7) is prepared. This is what allows verification to exercise
+one task at a time: the aggregate task pulls in the desktop applications, which
+are roughly 15 GB of downloads that no check needs.
+
+**GEN-R-16** The tool-install location variable SHALL be exported by exactly
+two places: the entry point, for the setup run itself, and the rendered
+login-shell profile, for every later interactive session (GEN-A-11). It SHALL
+NOT be set from the orchestrator's own configuration, which is read too late
+(GEN-A-7). Both exporters SHALL derive it from the application-directory
+setting rather than repeating a literal path (GEN-R-1b).
+
+### Destructive operations
+
+**GEN-R-17** A task SHALL NOT delete, or forcibly overwrite, a path it did not
+create. Where a task would otherwise remove an existing path in order to
+recreate it, it SHALL first establish that the path is its own; if it is not,
+the task SHALL fail, name the path, and change nothing. The message is required
+for correctness here, not diagnostic output.
+
+**GEN-R-17a** For fetched sources this means the fetch step SHALL refuse a path
+that is a registered submodule of this repository, and SHALL refuse a git work
+tree carrying uncommitted changes. The refusal SHALL cover a forced checkout as
+well as recursive deletion: a forced checkout discards uncommitted work just as
+effectively. An existing clean clone already at the pinned ref SHALL be reused
+in place and SHALL NOT be re-fetched.
+
+**GEN-R-17b** For deployment (GEN-D-11) this means the link step SHALL refuse a
+target in the user's home directory that exists and is not already a symbolic
+link resolving into this repository. An existing symbolic link that does
+resolve into this repository SHALL be replaced silently, so that re-running is
+a no-op (GEN-R-4).
+
+### Freshness
+
+**GEN-R-18** Where a build's freshness is decided by a version stamp, the stamp
+SHALL be written by a separate step that always runs and that precedes the
+gated build, never from inside the gated build itself (GEN-A-12). The stamp's
+content SHALL be a pure function of the pins it represents, so that an
+unchanged pin reproduces byte-identical content and the gate still reports the
+build as fresh.
+
 ---
 
 ## 5. Verification of the global requirements
@@ -254,9 +362,15 @@ not inferred from a binary name.
 | GEN-R-5 | The orchestrator can print a dependency graph |
 | GEN-R-6, GEN-R-7 | Every source in every tool document appears in the single pin file, and nowhere else |
 | GEN-R-8 | Searching per-tool definitions for OS conditionals returns nothing |
+| GEN-R-8b | Each command-existence guard is shown to suppress the error on a machine without the command while still taking effect on a machine with it |
 | GEN-R-9 | Each tool document's declared inputs account for every value it consumes |
 | GEN-R-10 | Preview mode runs and changes nothing |
 | GEN-R-13 | Every managed tool has a matching document in this directory |
+| GEN-R-15 | The entry point given a task name runs that task and its declared predecessors only; given no argument it runs `all` |
+| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory under the application directory; the orchestrator's configuration contains no assignment of that variable |
+| GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
+| GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
+| GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |
 
 ---
 

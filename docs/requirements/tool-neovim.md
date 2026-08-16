@@ -66,6 +66,25 @@ tarball extracted *inside another repository*, which is exactly this layout.
 That was corrected upstream and backported to 0.8, so v0.11.6 is unaffected.
 `VERIFIED` - upstream change and its backport.
 
+**NVIM-R-9** Build freshness SHALL be keyed on a version stamp holding the
+pinned version and the install prefix, with that stamp as the build's only
+declared input and the installed binary as its only declared output.
+
+**NVIM-R-10** The stamp SHALL be written by a separate step that always runs
+and that the build declares as a predecessor, not from inside the build itself
+(GEN-R-18, GEN-A-12). A stamp written inside the gated body cannot invalidate
+the gate that guards it, so a version bump would never rebuild. Because the
+stamp's content is a pure function of the pinned version and the prefix, an
+unchanged pin reproduces the same bytes and the build is still correctly
+skipped.
+
+**NVIM-A-7** A change of install prefix invalidates the build twice over: the
+prefix is part of the stamp, and the declared output is expressed in terms of
+the prefix, so a new prefix names a path that does not yet exist. `VERIFIED` -
+observed while implementing the build task. Upstream also requires a clean
+build directory whenever the install prefix changes, which is why the prefix
+belongs in the stamp at all.
+
 ## 6. Declared inputs
 
 | Input | Source |
@@ -109,3 +128,5 @@ removed outright under GEN-A-2.)
 | NVIM-A-4 | Reported version is exactly `v0.11.6`, with no development suffix |
 | NVIM-R-5 | The build succeeds on a machine with no system CMake installed |
 | NVIM-R-8 | The provider package is installed and the editor reports Python support |
+| NVIM-R-9 | The build declares exactly one input and one output |
+| NVIM-R-10 | A second run with the pin unchanged reports the build as up to date and skips it; changing the pinned version and re-running rebuilds, and changing it back rebuilds again |

@@ -49,6 +49,29 @@ decisions.** The two items that were outstanding have been closed:
 - `APPS-A-4` - desktop applications install **system-wide**, matching current
   behaviour (`APPS-R-6`).
 
+## Corrections recorded after implementation
+
+Implementation contradicted several statements written from documentation
+alone. Observation of the pinned tooling outranks documentation, so the
+statements were corrected in place rather than withdrawn, and the identifiers
+kept their numbers:
+
+- `GEN-A-8` - the declarative system-package interface is
+  `[bootstrap.packages]` applied by `mise bootstrap packages apply`, with
+  `[bootstrap.user].login_shell` for the login shell. The names this set
+  originally recorded do not exist in mise 2026.8.6.
+- `ZSH-R-12` - zsh-autosuggestions is fetched to
+  `zsh/custom/plugins/zsh-autosuggestions`, not under `vendor/`.
+- `KITTY-R-3` / `KITTY-R-4` - deployment replaces only a symbolic link that
+  already points into this repository, and refuses anything else, rather than
+  replacing whatever it finds.
+
+New identifiers were appended for behaviour that implementation added:
+`GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-R-8b`, `GEN-R-15` through
+`GEN-R-18`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through `ZSH-R-14`,
+`ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`, `APPS-R-9` and
+`APPS-A-9`.
+
 ## Scope
 
 Fedora is the only supported platform (`GEN-A-2`). Package names are recorded

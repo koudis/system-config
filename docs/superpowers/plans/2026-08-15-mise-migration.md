@@ -10,13 +10,24 @@
 
 **Spec:** `docs/spec-mise-migration.md`. Requirements it implements: `docs/requirements/general.md` and `docs/requirements/tool-*.md`. Procedure for later additions: `docs/adding-a-new-tool.md`.
 
+## Status and corrections to this plan
+
+Tasks 1 through 9 are implemented and reviewed. **Task 10 is paused by an explicit decision and has not run**: the 14 legacy shell scripts, `.gitmodules` and all 9 submodules are still present in the working tree.
+
+Four things this plan got wrong were corrected during execution. They are fixed in place below, and are listed here because the plan text is otherwise the record of what was intended:
+
+1. **There is no `system` subcommand and no `packages` table under a `system` table** in mise 2026.8.6. `mise system --help` errors out and `system` is absent from the top-level command list; `mise bootstrap packages --help` succeeds. The real interface is the `[bootstrap.packages]` table, the command `mise bootstrap packages apply --yes --manager <manager>`, and `[bootstrap.user]` with key `login_shell`. Established empirically against the real binary, three times independently. See GEN-A-8.
+2. **The harness takes two mandatory arguments**, `test/run.sh <check-name> <mise-target>`, with no default. `[tasks.all]` depends on `apps`, which installs roughly 15 GB of desktop flatpaks, so no harness run may default to `all`; each scenario names the single mise target it verifies. `setup` forwards its arguments to `mise run` and defaults to `all` only when invoked directly with none (GEN-R-15).
+3. **Destructive steps refuse paths they did not create** (GEN-R-17). The fetch task fails loudly without deleting when a path is a registered submodule or a work tree with uncommitted changes, and the guard covers `checkout --force` as well as `rm -rf`. The link task refuses a `$HOME` target that is not already a symlink into this repository, while replacing an existing correct symlink silently.
+4. **Several smaller corrections**: zsh-autosuggestions is fetched to `zsh/custom/plugins/zsh-autosuggestions` rather than `vendor/`; `ZSH_CUSTOM` gets its own placeholder `___ZSH_CUSTOM_DIR___`; the Neovim freshness stamp is written by a separate ungated task; the rendered zshrc exports `APP_DIR`, `MISE_DATA_DIR` and `PATH` before activating mise.
+
 ## Global Constraints
 
 Copied verbatim from the spec and requirements. Every task's requirements implicitly include this section.
 
 - **Fedora only** (GEN-A-2). No operating-system conditionals anywhere (GEN-R-8). Package names are Fedora names only.
 - **Application directory** default `~/App`, overridable by `APP_DIR` (GEN-R-1b). Referenced by variable, never by literal path. All installed artifacts go there and nowhere else (GEN-R-1a). No second install prefix - `$HOME/Bin` is retired.
-- **`MISE_DATA_DIR` is read at process start** and cannot be set from `[env]` (GEN-A-7). Only `./setup` may export it.
+- **`MISE_DATA_DIR` is read at process start** and cannot be set from `[env]` (GEN-A-7). Exactly two places export it: `./setup`, for the setup run, and the rendered zshrc, for every later interactive shell (GEN-R-16, ZSH-R-13). This corrects an earlier "only `./setup` may export it" - an interactive shell that does not export it activates mise against its default data directory and installs outside the application directory.
 - **Every source URL is anonymous HTTPS** (GEN-A-4). No `git@github.com:` URLs.
 - **Every pin lives in `mise.toml` and nowhere else** (GEN-R-7). No shell constants, no gitlinks, no template values.
 - **Idempotent**: two consecutive runs, second one does nothing and exits zero (GEN-R-4).
@@ -39,7 +50,7 @@ Nothing else in this plan is safely testable without this. Every later task runs
 - Create: `test/assert.sh`
 
 **Interfaces:**
-- Produces: `test/run.sh <task-name>` builds a clean Fedora container, copies the repo in, runs `./setup`, and executes `test/assert.sh <task-name>`. Exit 0 means pass.
+- Produces: `test/run.sh <check-name> <mise-target>` builds a clean Fedora container, copies the repo in, runs `./setup <mise-target>` twice, and executes the check set `test/checks-<check-name>.sh` against the assertion helpers. Exit 0 means pass. Both arguments are mandatory and there is no default target: `[tasks.all]` depends on `apps`, which installs roughly 15 GB of desktop flatpaks, so every scenario names the single mise target it verifies.
 - Produces: `assert_cmd <description> <command>` and `assert_path_under <description> <binary> <prefix>` shell functions, sourced by later tasks.
 
 - [ ] **Step 1: Write the failing harness invocation**
@@ -106,7 +117,10 @@ Create `test/run.sh`:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-TASK="${1:?usage: test/run.sh <task-name>}"
+TASK="${1:?usage: test/run.sh <check-name> <mise-target>}"
+# No default target: "all" pulls in the apps task, roughly 15 GB of desktop
+# applications no check set exercises. Every caller states its target.
+TARGET="${2:?usage: test/run.sh <check-name> <mise-target>}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 podman build -t sysconfig-test -f "${REPO_ROOT}/test/Containerfile" "${REPO_ROOT}"
@@ -117,18 +131,20 @@ podman run --rm -i \
         set -euo pipefail
         cp -a /home/tester/repo /home/tester/work
         cd /home/tester/work
-        ./setup
+        ./setup ${TARGET}
         echo '--- second run (idempotence) ---'
-        ./setup
+        ./setup ${TARGET}
         source test/assert.sh
         source test/checks-${TASK}.sh
         finish
     "
 ```
 
+The two-argument signature is a correction to the plan as first written, forced by `[tasks.all]` depending on `apps`. It works because `setup` forwards its arguments to `mise run` (GEN-R-15). The final `test/run.sh` also disables SELinux relabeling of the bind mount and pins the container user namespace, and re-derives `APP_DIR`, `MISE_DATA_DIR` and `PATH` in the checking shell, because `./setup` ran as a child process and its exports never reached the parent.
+
 - [ ] **Step 4: Verify the harness fails correctly**
 
-Run: `chmod +x test/run.sh && test/run.sh smoke`
+Run: `chmod +x test/run.sh && test/run.sh smoke preview`
 
 Expected: FAIL - the container builds, but `./setup` does not exist yet. This proves the harness reaches the right point and does not silently pass.
 
@@ -169,7 +185,7 @@ assert_cmd  "cmakelib env exported"        bash -c 'cd /home/tester/work && mise
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh bootstrap`
+Run: `test/run.sh bootstrap preview`
 Expected: FAIL - `./setup` does not exist.
 
 - [ ] **Step 3: Write the wrapper**
@@ -241,7 +257,7 @@ run = "echo setup complete"
 [tasks.preview]
 run = """
 mise run --dry-run all
-mise system install --dry-run
+mise bootstrap packages apply --dry-run --manager dnf
 """"
 ```
 
@@ -259,7 +275,7 @@ vim/init.vim
 
 - [ ] **Step 6: Run the check**
 
-Run: `chmod +x setup && test/run.sh bootstrap`
+Run: `chmod +x setup && test/run.sh bootstrap preview`
 Expected: PASS on all five assertions.
 
 - [ ] **Step 7: Commit**
@@ -301,29 +317,31 @@ Note the correct package names (GEN-R-14): `the_silver_searcher` provides `ag`, 
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh packages`
+Run: `test/run.sh packages packages`
 Expected: FAIL - none of these are installed.
 
 - [ ] **Step 3: Determine which config key this mise supports**
 
-`[system]` is experimental and upstream is mid-rename (GEN-A-8). Before writing the config, find out which spelling the installed version accepts:
+The subsystem is experimental (GEN-A-8). Before writing the config, find out which spelling the installed version accepts:
 
 ```bash
-mise system --help 2>/dev/null && echo "USE [system.packages]"
+mise system --help 2>/dev/null && echo "USE the system spelling"
 mise bootstrap packages --help 2>/dev/null && echo "USE [bootstrap.packages]"
 ```
 
 Use whichever responds. If neither does, skip to Step 5 (the fallback).
 
+**Answered: only the second responds.** mise 2026.8.6 has no `system` subcommand at all - it is absent from the top-level command list - so the table and command names this plan first carried do not exist. Steps 4 and 6 below, and Task 4's Step 4, use the real interface.
+
 - [ ] **Step 4: Add the declarative system packages**
 
-Append to `mise.toml`, using the section name discovered in Step 3:
+Append to `mise.toml`, using the section name discovered in Step 3. `login_shell` must be an absolute path; mise rejects the bare name `zsh`:
 
 ```toml
-[system]
-login_shell = "zsh"
+[bootstrap.user]
+login_shell = "/usr/bin/zsh"
 
-[system.packages]
+[bootstrap.packages]
 "dnf:zsh"                 = "latest"
 "dnf:direnv"              = "latest"
 "dnf:fzf"                 = "latest"
@@ -340,12 +358,17 @@ login_shell = "zsh"
 "dnf:git"                 = "latest"
 
 [tasks.packages]
-run = "mise system install --yes"
+run = """
+mise bootstrap packages apply --yes --manager dnf
+sudo env "PATH=$PATH" mise bootstrap user apply --yes
+"""
 ```
+
+`--manager dnf` keeps this scoped, because Task 4 adds its Flatpak entries to the same table and those must not install before the Flathub remote exists. The login-shell apply needs `sudo` because `chsh` authenticates the target user through PAM and would otherwise block on a password prompt, and it needs `env "PATH=$PATH"` because sudo's `secure_path` drops `$APP_DIR/bin`, where mise itself lives.
 
 - [ ] **Step 5: Fallback if the experimental subsystem is unusable**
 
-Only if Step 3 found nothing. Replace the `[system.packages]` block and the `packages` task with a single task holding the same list - the OS branching still disappears, because Fedora is the only target (GEN-R-8):
+Only if Step 3 found nothing. Replace the package table and the `packages` task with a single task holding the same list - the OS branching still disappears, because Fedora is the only target (GEN-R-8):
 
 ```toml
 [tasks.packages]
@@ -359,7 +382,7 @@ sudo chsh -s "$(command -v zsh)" "$USER"
 
 - [ ] **Step 6: Run the check**
 
-Run: `test/run.sh packages`
+Run: `test/run.sh packages packages`
 Expected: PASS on all nine assertions.
 
 - [ ] **Step 7: Commit**
@@ -403,7 +426,7 @@ done
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh apps`
+Run: `test/run.sh apps flathub`
 Expected: FAIL - no flatpak, no remote.
 
 - [ ] **Step 3: Add the remote task**
@@ -423,10 +446,10 @@ Adding the remote manually is what removes Fedora's filter (APPS-A-7). `--if-not
 
 - [ ] **Step 4: Add flatpak to the package list and the apps task**
 
-Add `"dnf:flatpak" = "latest"` to the `[system.packages]` block from Task 3, then append:
+Add `"dnf:flatpak" = "latest"` to the `[bootstrap.packages]` block from Task 3, then add these entries **into that same table** - TOML forbids a duplicate table header, so there is no second one:
 
 ```toml
-[system.packages]
+# continues the single [bootstrap.packages] table from Task 3
 "flatpak:org.kicad.KiCad"              = "latest"
 "flatpak:org.freecad.FreeCAD"          = "latest"
 "flatpak:net.ankiweb.Anki"             = "latest"
@@ -447,14 +470,16 @@ Add `"dnf:flatpak" = "latest"` to the `[system.packages]` block from Task 3, the
 
 [tasks.apps]
 depends = ["flathub"]
-run = "mise system install --yes --manager flatpak"
+run = "mise bootstrap packages apply --yes --manager flatpak"
 ```
 
 `flatpak` (not `flatpak-user`) is system scope (APPS-R-6). `"latest"` is mandatory - the manager rejects version pins (APPS-A-1).
 
+This task's own scenario runs the `flathub` target, not `apps`: the checks below verify the remote and the resolvability of every application ID, and installing 17 desktop applications into a throwaway container is neither necessary for that nor affordable. The consequence is recorded as a residual risk - the apply path itself is never exercised in a container (APPS-A-9, spec RR5).
+
 - [ ] **Step 5: Run the check**
 
-Run: `test/run.sh apps`
+Run: `test/run.sh apps flathub`
 Expected: PASS. If `remote-info` fails for an application, that ID has changed upstream - correct it in both `mise.toml` and `docs/requirements/tool-desktop-apps.md`.
 
 - [ ] **Step 6: Commit**
@@ -491,7 +516,7 @@ assert_cmd        "no Bin prefix"         test ! -d "$HOME/Bin"
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh tools`
+Run: `test/run.sh tools tools`
 Expected: FAIL - neither tool installed.
 
 - [ ] **Step 3: Add the tools task**
@@ -508,7 +533,7 @@ Go was previously unmanaged: the shell template injected `$HOME/App/go/go1.23.3/
 
 - [ ] **Step 4: Run the check**
 
-Run: `test/run.sh tools`
+Run: `test/run.sh tools tools`
 Expected: PASS on all five assertions.
 
 - [ ] **Step 5: Commit**
@@ -528,7 +553,7 @@ git commit -m "feat: install pinned cmake and go into the application directory"
 
 **Interfaces:**
 - Consumes: pins `OHMYZSH_REF`, `AUTOSUGGEST_REF`, `CMLIB_*_REF` from Task 2.
-- Produces: `vendor/ohmyzsh`, `vendor/zsh-autosuggestions`, `vendor/cmakelib{,-component-*}`, consumed by Tasks 8 and 9.
+- Produces: `vendor/ohmyzsh`, `zsh/custom/plugins/zsh-autosuggestions`, `vendor/cmakelib{,-component-*}`, consumed by Tasks 8 and 9. The autosuggestions plugin does **not** go under `vendor/`: Oh My Zsh resolves custom plugins only under `$ZSH_CUSTOM/plugins/`, so it is cloned to its real load path rather than symlinked from `vendor/` (ZSH-A-7, ZSH-R-12). It is gitignored like the rest of the fetched content.
 
 - [ ] **Step 1: Write the failing check**
 
@@ -538,19 +563,19 @@ Create `test/checks-fetch.sh`:
 assert_cmd "ohmyzsh is a git work tree"  git -C vendor/ohmyzsh rev-parse --is-inside-work-tree
 assert_cmd "ohmyzsh at pinned ref"       bash -c '[[ $(git -C vendor/ohmyzsh rev-parse HEAD) == "$OHMYZSH_REF" ]]'
 assert_cmd "ohmyzsh not group-writable"  bash -c '[[ ! -w vendor/ohmyzsh || $(stat -c %A vendor/ohmyzsh | cut -c6) == "-" ]]'
-assert_cmd "autosuggestions at pin"      bash -c '[[ $(git -C vendor/zsh-autosuggestions rev-parse HEAD) == "$AUTOSUGGEST_REF" ]]'
+assert_cmd "autosuggestions at pin"      bash -c '[[ $(git -C zsh/custom/plugins/zsh-autosuggestions rev-parse HEAD) == "$AUTOSUGGEST_REF" ]]'
 for c in cmakelib cmakelib-component-cmconf cmakelib-component-cmdef \
          cmakelib-component-cmutil cmakelib-component-storage; do
     assert_cmd "present: $c" test -d "vendor/$c"
 done
-assert_cmd "no ssh remotes anywhere"     bash -c '! grep -rq "git@github.com" vendor/*/.git/config'
+assert_cmd "no ssh remotes anywhere"     bash -c '! grep -rq "git@github.com" vendor/*/.git/config zsh/custom/plugins/zsh-autosuggestions/.git/config'
 ```
 
 The cmakelib check covers all five components, including `cmakelib-component-cmconf`, which is the currently orphaned gitlink (CMLIB-A-1).
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh fetch`
+Run: `test/run.sh fetch fetch`
 Expected: FAIL - `vendor/` does not exist.
 
 - [ ] **Step 3: Add the fetch task**
@@ -562,33 +587,36 @@ Append to `mise.toml`. All URLs are anonymous HTTPS (GEN-A-4), replacing the fou
 run = """
 set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
-mkdir -p vendor
+mkdir -p vendor zsh/custom/plugins
 
 fetch_pinned() {
-    local name="$1" url="$2" ref="$3" dir="vendor/$1"
-    if [[ ! -d $dir/.git ]]; then
-        rm -rf "$dir"
-        git clone --quiet "$url" "$dir"
-    fi
-    git -C "$dir" fetch --quiet --tags origin
-    git -C "$dir" checkout --quiet --force "$ref"
+    local dir="$1" url="$2" ref="$3"
+    # ... clone if absent, then move to the pinned ref; see the guard below
 }
 
-fetch_pinned ohmyzsh             https://github.com/ohmyzsh/ohmyzsh.git                       "$OHMYZSH_REF"
-fetch_pinned zsh-autosuggestions https://github.com/zsh-users/zsh-autosuggestions.git         "$AUTOSUGGEST_REF"
-fetch_pinned cmakelib            https://github.com/cmakelib/cmakelib.git                     "$CMLIB_REF"
-fetch_pinned cmakelib-component-cmconf  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
-fetch_pinned cmakelib-component-cmdef   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
-fetch_pinned cmakelib-component-cmutil  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
-fetch_pinned cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
+fetch_pinned vendor/ohmyzsh                          https://github.com/ohmyzsh/ohmyzsh.git                     "$OHMYZSH_REF"
+fetch_pinned zsh/custom/plugins/zsh-autosuggestions  https://github.com/zsh-users/zsh-autosuggestions.git       "$AUTOSUGGEST_REF"
+fetch_pinned vendor/cmakelib                         https://github.com/cmakelib/cmakelib.git                   "$CMLIB_REF"
+fetch_pinned vendor/cmakelib-component-cmconf   https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
+fetch_pinned vendor/cmakelib-component-cmdef    https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
+fetch_pinned vendor/cmakelib-component-cmutil   https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
+fetch_pinned vendor/cmakelib-component-storage  https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
 """
 ```
 
 ohmyzsh must be a clone, not an archive: its update check aborts unless `$ZSH` is a git work tree (ZSH-A-1).
 
+**The function must refuse to delete a path it did not create** (GEN-R-17a). The first draft of this plan cleared the target with `rm -rf` before cloning and then force-checked-out the ref unconditionally. Both are unsafe while the migration is incomplete: the submodules are still in the working tree, `zsh/custom/plugins/zsh-autosuggestions` is one of them, and two submodule checkouts are dirty right now. As implemented, the step:
+
+- refuses, exits non-zero and names the path if the target is a registered submodule of this repository (a gitlink, mode 160000), deleting nothing;
+- refuses the same way if the target is a git work tree with uncommitted changes, and applies that check to the forced checkout as well as to the delete, because a forced checkout destroys uncommitted work just as effectively;
+- reuses an existing clone in place, and resolves the ref locally first so a work tree already at the pinned ref touches neither the network nor the disk, which is what makes a second run a genuine no-op.
+
+Detecting the work tree tests for `$dir/.git` directly rather than asking git: a plain subdirectory without its own `.git` makes git walk up to the enclosing repository, which silently points every subsequent command at the wrong repository instead of failing.
+
 - [ ] **Step 4: Run the check**
 
-Run: `test/run.sh fetch`
+Run: `test/run.sh fetch fetch`
 Expected: PASS on all nine assertions.
 
 - [ ] **Step 5: Commit**
@@ -626,7 +654,7 @@ The "no dev suffix" check is the one that matters: it proves the tarball build p
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh nvim`
+Run: `test/run.sh nvim nvim`
 Expected: FAIL - nvim not installed.
 
 - [ ] **Step 3: Add the build task**
@@ -634,17 +662,22 @@ Expected: FAIL - nvim not installed.
 Append to `mise.toml`. Freshness keys on the version stamp, not the source tree (spec 5.5) - one source, one output:
 
 ```toml
+# The stamp carries the prefix as well as the version: changing APP_DIR must
+# retrigger the build, and upstream requires a clean build dir whenever
+# CMAKE_INSTALL_PREFIX changes. It is written by its own always-run task,
+# never from inside the gated build below (GEN-R-18, NVIM-R-10).
+[tasks.nvim-stamp]
+run = """
+mkdir -p .build
+printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
+"""
+
 [tasks.nvim]
-depends = ["tools", "packages"]
+depends = ["tools", "packages", "nvim-stamp"]
 sources = [".build/nvim.version"]
 outputs = ["{{env.APP_DIR}}/bin/nvim"]
 run = """
 set -euo pipefail
-mkdir -p .build
-# The stamp carries the prefix as well as the version: changing APP_DIR must
-# retrigger the build, and upstream requires a clean build dir whenever
-# CMAKE_INSTALL_PREFIX changes.
-printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
 src=".build/neovim-${NVIM_VERSION}"
 if [[ ! -d $src ]]; then
     curl -fsSL "https://github.com/neovim/neovim/archive/refs/tags/${NVIM_VERSION}.tar.gz" \
@@ -659,6 +692,8 @@ make CMAKE_INSTALL_PREFIX="$APP_DIR" install
 """
 ```
 
+**The stamp cannot be written inside the gated task.** The first draft of this plan wrote it in the build body, where it can never invalidate the gate that guards it: the write happens only after mise has already decided whether to run the task, so bumping `NVIM_VERSION` would not have rebuilt. Splitting the write into `nvim-stamp`, declared as a predecessor, fixes it without giving up caching - `source_freshness_hash_contents` compares content, and an unchanged version and prefix reproduce byte-identical content, so the build is still skipped. The predecessor is declared on the task itself, so a direct `mise run nvim` cannot bypass it either. Verified live: first run builds, second run reports the sources up to date and skips in milliseconds (GEN-A-12).
+
 The variable is `CMAKE_PRG`, not `CMAKE_PROGRAM`. Neovim's Makefile declares
 `CMAKE_PRG ?= $(shell (command -v cmake3 || echo cmake))`; any other spelling is
 silently ignored and make falls back to a bare `cmake` on `PATH` - which is
@@ -669,7 +704,7 @@ to exist.
 
 - [ ] **Step 4: Run the check**
 
-Run: `test/run.sh nvim`
+Run: `test/run.sh nvim nvim`
 Expected: PASS on all four. This is the slowest task - the container build takes several minutes.
 
 - [ ] **Step 5: Commit**
@@ -713,7 +748,7 @@ assert_cmd    "patch file gone"         test ! -f zsh/muse_theme.patch
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh render`
+Run: `test/run.sh render render`
 Expected: FAIL - nothing rendered, template still carries the removed fragments.
 
 - [ ] **Step 3: Extract the theme**
@@ -754,17 +789,20 @@ CMLIB-R-3 at once.
 
 In `zsh/template/zshrc_template`:
 
-1. Delete the line `PATH="___USER_BIN_DIR___:___GO_BIN_DIR___:${PATH}"` and replace it with `eval "$(mise activate zsh)"`. Tool visibility now comes from mise activation, covering every installed artifact at once (ZSH-R-10, GO-R-2).
+1. Delete the line `PATH="___USER_BIN_DIR___:___GO_BIN_DIR___:${PATH}"` and replace it with the export block and the guarded activation described below. Tool visibility now comes from mise activation, covering every installed artifact at once (ZSH-R-10, GO-R-2).
 2. Delete the final ghcup line entirely. It is dead - the directory does not exist, no Haskell toolchain is present, and it hardcodes a username (GO-A-4, GEN-R-2).
-3. Change `ZSH_PROJECT_DIR=___OHMYZSH_PROJECT_DIR___` so `ZSH` points at `vendor/ohmyzsh` and `ZSH_CUSTOM` points at the repository's `zsh/custom`.
+3. Delete the line that sources the rendered `zsh/config`, which Step 4a removes. Find it by content, not by line number.
+4. Point `ZSH` at `vendor/ohmyzsh` via `___OHMYZSH_PROJECT_DIR___`, and point `ZSH_CUSTOM` at the repository's `zsh/custom` via its **own** placeholder `___ZSH_CUSTOM_DIR___`. One placeholder cannot yield both: the framework is fetched content under `vendor/`, the custom directory is committed content under `zsh/`, and they are unrelated roots (ZSH-R-14).
+
+**Export order is load-bearing** (ZSH-R-13). The rendered file exports `APP_DIR`, then `MISE_DATA_DIR`, then `PATH`, and only then activates mise. mise reads `MISE_DATA_DIR` at process start, so activating first leaves an ordinary interactive shell using mise's default data directory - and anything it installs from then on lands outside the application directory, breaking the containment invariant (GEN-A-11, GEN-R-1a). This makes the rendered profile the second legitimate exporter of `MISE_DATA_DIR` beside `./setup`, which supersedes the "only `./setup` may export it" constraint stated above.
+
+**Activation is guarded** on mise existing: `command -v mise >/dev/null && eval "$(mise activate zsh)"`. An existence guard is not the operating-system conditional GEN-R-8 forbids - that prohibition targets platform branching, dead code in a Fedora-only repository, whereas this branches on whether setup has run yet. Without it every shell start on a fresh notebook, a restored set of dotfiles, or a wiped `$APP_DIR` reports a missing command. The same idiom is already used at `setup:14` and `test/run.sh:29` (GEN-R-8b, ZSH-R-13a).
 
 - [ ] **Step 5: Add the render task**
 
 ```toml
 [tasks.render]
 depends = ["fetch"]
-sources = ["zsh/template/*", "vim/template/*", "mise.toml"]
-outputs = ["zsh/zshrc", "vim/init.vim"]
 run = """
 set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
@@ -772,18 +810,24 @@ root="$(git rev-parse --show-toplevel)"
 cp zsh/template/zshrc_template    zsh/zshrc
 cp vim/template/init_template.vim vim/init.vim
 
-sed -i "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g" zsh/zshrc
-sed -i "s|___VIM_BASE_DIR___|${root}/vim|g"           vim/init.vim
+sed -i "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g"  zsh/zshrc
+sed -i "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g"   zsh/zshrc
+sed -i "s|___VIM_BASE_DIR___|${root}/vim|g"            vim/init.vim
 """
 ```
 
-Two placeholders are ported. `___USER_BIN_DIR___` and `___GO_BIN_DIR___` are
-deleted (spec 7), and `___CMAKELIB_DIR___` disappears together with its template
-in Step 4a.
+The task declares no `sources`/`outputs`: multiple-output freshness is a known
+mise failure mode (spec 5.5), and the body is two copies plus three
+substitutions, so always running it is idempotent by construction and also
+overwrites output left behind by the retired shell scripts.
+
+Two placeholders are ported and one is added (`___ZSH_CUSTOM_DIR___`).
+`___USER_BIN_DIR___` and `___GO_BIN_DIR___` are deleted (spec 7), and
+`___CMAKELIB_DIR___` disappears together with its template in Step 4a.
 
 - [ ] **Step 6: Run the check**
 
-Run: `test/run.sh render`
+Run: `test/run.sh render render`
 Expected: PASS on all ten assertions.
 
 - [ ] **Step 7: Commit**
@@ -804,7 +848,7 @@ git commit -m "feat: render configs, commit theme, move cmakelib env to the tool
 
 **Interfaces:**
 - Consumes: rendered files from Task 8.
-- Produces: the four symlinks in `$HOME`.
+- Produces: three symlinks in `$HOME` - `.zshrc`, `.config/nvim/init.vim`, `.config/kitty/kitty.conf`. Not four: `.zshrc_config` is deliberately gone with the fragment Task 8 deleted, and the check asserts its absence. There is no `.vimrc` anywhere in this repository.
 
 - [ ] **Step 1: Write the failing check**
 
@@ -824,7 +868,7 @@ The harness already runs `./setup` twice, so a PASS here also proves idempotence
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh link`
+Run: `test/run.sh link link`
 Expected: FAIL - no links exist.
 
 - [ ] **Step 3: Add the link task**
@@ -837,8 +881,10 @@ set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 
 link() {
-    mkdir -p "$(dirname "$2")"
-    ln -sfn "$1" "$2"
+    local src="$1" dst="$2"
+    mkdir -p "$(dirname "$dst")"
+    # ... replace only a symlink already resolving into this repo; refuse
+    #     anything else, loudly, without touching it
 }
 
 link "${root}/zsh/zshrc"        "$HOME/.zshrc"
@@ -847,11 +893,13 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 ```
 
-`mkdir -p` then `ln -sfn` makes every deployment repeatable without a preceding removal.
+`mkdir -p` first makes every deployment repeatable without a preceding removal, which is what `kitty/setup.sh` omits (KITTY-A-1).
+
+**Replacing the target unconditionally is not acceptable** (GEN-R-17b, KITTY-R-4). The first draft used a bare `ln -sfn`, which silently destroys whatever is at the target. On the real machine those targets may be the user's own files, and the harness runs in a throwaway container where that loss can never be observed. As implemented, the step replaces an existing symbolic link that already resolves into this repository - silently, so a re-run is a clean no-op - and for anything else that exists (a real file, or a symlink pointing outside the repository) it exits non-zero and names the path, changing nothing. Proved by placing a real file at a target and showing its contents survive.
 
 - [ ] **Step 4: Run the check**
 
-Run: `test/run.sh link`
+Run: `test/run.sh link link`
 Expected: PASS on all eight assertions.
 
 - [ ] **Step 5: Commit**
@@ -866,6 +914,8 @@ git commit -m "feat: deploy configuration symlinks idempotently"
 ### Task 10: Remove the legacy implementation
 
 Only after Task 9 passes. This is the destructive task and is deliberately last and separate, so it reverts cleanly.
+
+**Not run. Paused by an explicit decision.** Everything this task deletes is still present: the 14 legacy shell scripts, `lib.sh`, `.gitmodules`, and all 9 gitlinks including the orphaned `cmakelib-component-cmconf`. Two submodule checkouts currently carry uncommitted changes. Two consequences follow while that holds. First, the fetch task's refusal to touch a registered submodule (Task 6) is the only thing standing between a `./setup fetch` on the real machine and a live submodule checkout, so it is load-bearing rather than theoretical. Second, `zsh/setup.sh` is broken from Task 8 onward, because it still references the `zsh/template/config_template` that Task 8 deleted and the placeholders it removed; this task owns that breakage.
 
 **Files:**
 - Delete: `setup.sh`, `lib.sh`
@@ -889,7 +939,7 @@ assert_cmd "every tool has a doc"    bash -c 'for t in zsh neovim cmake cmakelib
 
 - [ ] **Step 2: Run it to confirm failure**
 
-Run: `test/run.sh acceptance`
+Run: `test/run.sh acceptance link`
 Expected: FAIL - submodules and scripts still present.
 
 - [ ] **Step 3: Remove the submodules**
@@ -924,7 +974,7 @@ git rm setup.sh lib.sh \
 
 - [ ] **Step 5: Run the full acceptance check**
 
-Run: `test/run.sh acceptance`
+Run: `test/run.sh acceptance link`
 Expected: PASS on all seven, and every earlier task's checks still pass.
 
 - [ ] **Step 6: Update the README**
@@ -967,6 +1017,8 @@ Spec section 10 acceptance criteria, mapped to the task that proves each:
 Recorded so the executor does not mistake a green run for total coverage:
 
 - The container cannot launch graphical applications. Task 4 proves the remote is unfiltered and every application ID resolves, not that the apps run.
-- `chsh` inside a container is not identical to a real login. Task 3 checks the passwd entry, not an interactive login.
+- **The flatpak apply path is never exercised at all.** No harness run installs an application, because the harness never runs the `apps` target and a real `flatpak install --system` needs a working system bus the sandboxed container does not have. A resolvable application ID can still fail to install for reasons no check covers - disk space, architecture, runtime conflicts - and the first real signal comes from the user's own machine. The same apply mechanism is proven with `--manager dnf` in Task 3, which is what bounds the risk (APPS-A-9, spec RR5).
+- `chsh` inside a container is not identical to a real login. Task 3 checks the passwd entry, not an interactive login. The login shell must also be declared as an absolute path (`/usr/bin/zsh`; mise rejects the bare name), and applying it needs `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh` authenticates through PAM and sudo's `secure_path` drops `$APP_DIR/bin`. The apply is unconditional, so it asks for elevation on every run (ZSH-A-8, ZSH-A-9, spec RR6).
 - Kitty cannot run headless. Task 9 checks the link and its parent directory only.
+- The deployment and fetch guards protect against damage the container can never demonstrate, since it starts empty every time. They were proved by constructing the dangerous state deliberately - a real file at a link target, a registered submodule and a dirty work tree at a fetch target.
 - A first real run on the actual notebook remains necessary after Task 10.

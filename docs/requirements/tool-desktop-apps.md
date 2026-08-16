@@ -77,7 +77,10 @@ All seventeen are currently tier 1 (Flatpak).
 
 **APPS-R-5** The list SHALL live in the single declarative location alongside
 the distribution packages, not in a separate imperative step with its own
-wrapper.
+wrapper. In practice that is the same `[bootstrap.packages]` table as the
+distribution packages, because a duplicate table header is not permitted
+(GEN-A-8a); the two are separated when applied, by naming the manager, not by
+being declared apart.
 
 ## 5. Installation scope
 
@@ -126,6 +129,28 @@ calls the installer with an application identifier and no remote, having never
 added one. On a fresh machine without Third-Party Repositories enabled, all
 seventeen fail. `VERIFIED` - read from the current setup step.
 
+**APPS-R-9** The applications SHALL be applied in a step of their own that
+follows the remote step, by applying only the Flatpak entries of the shared
+table. The distribution packages are applied earlier by naming the other
+manager. Two steps are required by the ordering constraint in APPS-R-7 and are
+possible only because the manager can be named at apply time (GEN-A-8a).
+
+## 6a. What is not verified
+
+**APPS-A-9** The application install path is never exercised end to end. The
+verification harness proves that the remote exists, that it is unfiltered, and
+that every one of the seventeen identifiers resolves against it - not that the
+applications install. A resolvable identifier can still fail to install for
+reasons no check covers: disk space, architecture mismatch, or a runtime
+conflict. A genuine system-scope Flatpak install needs a working system bus
+that the sandboxed container does not have, so nothing cheap closes this gap.
+`VERIFIED` - both halves were observed: the harness never runs the application
+target, and the sandboxed container provides no system bus. The first real
+signal therefore comes from the user's own machine, and this is an
+accepted risk rather than a covered case. The same apply mechanism is proven
+against the distribution-package manager, and every identifier is proven to
+resolve, which is what bounds the risk.
+
 ## 7. Declared inputs
 
 | Input | Source |
@@ -146,3 +171,5 @@ everything else (GEN-R-5).
 | APPS-R-7 | On a machine with Third-Party Repositories disabled and no remote configured, setup still installs all seventeen |
 | APPS-R-8 | Setup runs twice in succession without error |
 | APPS-R-4 | No application is installed from two sources simultaneously |
+| APPS-R-9 | The application step declares the remote step as its predecessor, and applying it names the Flatpak manager only |
+| APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all seventeen are confirmed installed and system-scoped |

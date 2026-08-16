@@ -1,6 +1,9 @@
 # Spec: Replace shell orchestration with mise, remove submodules
 
-Status: DRAFT - validated against upstream sources 2026-08-15
+Status: IMPLEMENTED except for the removal step - validated against upstream
+sources 2026-08-15, then corrected against the pinned mise release (2026.8.6)
+and the implemented `mise.toml` on 2026-08-16. See section 9 for what has and
+has not run.
 Repo: system config for a fresh Fedora notebook (Fedora only - see GEN-A-2)
 
 ## 1. Problem
@@ -87,8 +90,13 @@ Consequences:
   repository.
 - The Go SDK moves from its hardcoded path into the same directory, installed
   rather than assumed.
-- Fetched *runtime content* (ohmyzsh, autosuggestions, cmakelib) stays in the
-  repository under `vendor/`, gitignored. It is read at runtime, not installed.
+- Fetched *runtime content* (ohmyzsh, cmakelib) stays in the repository under
+  `vendor/`, gitignored. It is read at runtime, not installed. The one
+  exception is zsh-autosuggestions, which is fetched to
+  `zsh/custom/plugins/zsh-autosuggestions` - also inside the repository, also
+  gitignored - because Oh My Zsh resolves custom plugins only under
+  `$ZSH_CUSTOM/plugins/` (ZSH-A-7, ZSH-R-12). Fetching it to its real load path
+  is preferred over fetching it to `vendor/` and adding a symlink.
 - Fetched *build inputs* (Neovim, CMake sources) land in `<repo>/.build`,
   gitignored, and are scratch.
 - Deleting the application directory and re-running setup restores a working
@@ -106,7 +114,7 @@ config-resolution case (it walks up from cwd), so no global config is involved.
 | `[tasks]` with `depends` | `. ${project_setup}` sourcing + `unset setup` hack |
 | `sources` / `outputs` | nothing - new; provides idempotence |
 | `[tools]` | `CMAKE_VERSION` constant + `cmake/CMake` submodule, plus Go, previously unmanaged |
-| `[system.packages]` (see 5.2) | all 6 `install_deps.sh` + `flatpak/setup.sh` |
+| `[bootstrap.packages]` (see 5.2) | all 6 `install_deps.sh` + `flatpak/setup.sh` |
 
 ### 5.1 Bootstrap wrapper
 
@@ -116,9 +124,19 @@ config-resolution case (it walks up from cwd), so no global config is involved.
 1. Installs mise if absent.
 2. Resolves the application directory setting (default `~/App`) and exports
    `MISE_DATA_DIR` beneath it.
-3. Runs `mise run all`.
+3. Forwards its arguments to `mise run`, defaulting to `all` when given none
+   (GEN-R-15).
 
-### 5.2 System packages - use `[system.packages]`, with a fallback
+Step 3 is what makes a single task runnable without bypassing the wrapper, and
+the wrapper is the only place the process-start environment is prepared. It
+matters for verification: `all` depends on `apps`, which installs roughly 15 GB
+of desktop applications, so a harness run that could only run `all` would make
+the rest of the work untestable.
+
+The wrapper is not the only exporter of `MISE_DATA_DIR`. The rendered zshrc is
+the second, and legitimately so - see 5.4.
+
+### 5.2 System packages - use `[bootstrap.packages]`, with a fallback
 
 mise has native declarative system-package support covering exactly this
 repo's needs, including a **`flatpak` manager** alongside `dnf`:
@@ -126,23 +144,34 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
 - Managers are keyed `manager:package`, so packages are declared as `dnf:zsh`.
   With Fedora as the only target (GEN-A-2) the OS branching is not relocated
   but **deleted**, along with the second branch of every conditional.
-- `mise system install --dry-run` prints commands without running them,
-  supplying the dry-run this repo has never had.
-- sudo elevation is explicit and logged; `system_packages.sudo = false`
-  forbids it and prints the command instead. It never hangs waiting for a
-  password.
-- `[system].login_shell` adds the shell to `/etc/shells` and applies `chsh -s`.
-  **This removes the manual `chsh` step** that `zsh/README.md` documents today.
-- `mise bootstrap --yes` is a single fresh-machine entry point and runs a task
-  named `bootstrap` afterwards if defined.
+- `mise bootstrap packages apply --dry-run --manager <manager>` prints commands
+  without running them, supplying the dry-run this repo has never had.
+- sudo elevation is explicit and logged. It never hangs waiting for a password.
+- `[bootstrap.user]` with key `login_shell` adds the shell to `/etc/shells` and
+  applies `chsh -s`. **This removes the manual `chsh` step** that
+  `zsh/README.md` documents today. The value must be an absolute path
+  (`/usr/bin/zsh`); mise rejects the bare name. Applying it needs
+  `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
+  authenticates the target user through PAM - which blocks on a password prompt
+  for a non-root caller - and sudo's `secure_path` drops `$APP_DIR/bin`, where
+  mise itself lives.
+- Both managers' entries share one `[bootstrap.packages]` table, since TOML
+  forbids a duplicate header; they are separated at apply time by `--manager`.
 
-**Risk accepted with a fallback.** This subsystem is gated behind mise's
-experimental flag, and upstream is mid-rename: the same functionality is
-documented as both `mise system install` / `[system.packages]` and
-`mise bootstrap packages apply` / `[bootstrap.packages]`. If that churn proves
-disruptive, fall back to plain tasks shelling out to `dnf` and `flatpak`,
-keeping the OS branching in exactly one task instead of six files. The task
-DAG below is unchanged either way.
+**The naming this section originally recorded was wrong.** An earlier draft
+described the table as a `packages` table under a `system` table, applied by an
+`install` subcommand beneath a `system` command group, on the basis of
+upstream documentation that
+described an in-progress rename. Probing the pinned binary shows the rename has
+landed: mise 2026.8.6 has no `system` subcommand at all - `mise system --help`
+errors out and `system` is absent from the top-level command list - while
+`mise bootstrap packages --help` succeeds. The commands and tables above are
+the ones actually in use in `mise.toml`. See GEN-A-8.
+
+**Risk accepted with a fallback.** The subsystem remains gated behind mise's
+experimental flag. If it proves disruptive, fall back to plain tasks shelling
+out to `dnf` and `flatpak`, keeping the OS branching in exactly one task
+instead of six files. The task DAG below is unchanged either way.
 
 ### 5.3 Task DAG
 
@@ -154,14 +183,17 @@ all
  +-- go         [tools] pin                                     (depends: packages)
  +-- cmake      [tools] pin, or source build                    (depends: packages)
  +-- fetch      clone/download + verify vendored sources
- +-- nvim       source build, RelWithDebInfo                    (depends: cmake, fetch)
+ +-- nvim-stamp write the Neovim freshness stamp, always runs
+ +-- nvim       source build, RelWithDebInfo                    (depends: cmake, fetch, nvim-stamp)
  +-- render     sed templates -> generated files                (depends: fetch)
  +-- link       ln -sfn into $HOME                              (depends: render)
 ```
 
-Two ordering constraints are load-bearing:
+Three ordering constraints are load-bearing:
 
 - `link` follows `render` because the symlink targets are generated files.
+- `nvim` follows `nvim-stamp` because a freshness-gated task cannot write its
+  own gate input - see 5.5.
 - `apps` follows `flathub`, and therefore the Flatpak entries cannot be applied
   in the same step as the dnf entries. This is a direct consequence of
   APPS-A-5: mise will not create the remote, so it must exist first. Scoping
@@ -177,6 +209,24 @@ that directory is not yet on `PATH`, so the `nvim` task must invoke cmake by
 explicit path rather than relying on a bare `cmake`. The current
 `vim/setup.sh` relies on `PATH` and only works because a system cmake happens
 to be present.
+
+**The rendered zshrc exports `APP_DIR`, `MISE_DATA_DIR` and `PATH` before it
+activates mise, in that order** (ZSH-R-13). mise reads `MISE_DATA_DIR` at
+process start, so activating first means an ordinary interactive shell falls
+back to mise's default data directory - and every tool installed from that
+shell then lands outside the application directory, breaking the section 4
+invariant. This makes the rendered profile a second legitimate exporter of
+`MISE_DATA_DIR` beside `./setup`, and it corrects the earlier wording that
+`./setup` is the only place allowed to export it. The two exporters are not
+duplication: they cover two different process lifetimes, and both derive the
+value from the application-directory setting rather than from a literal path.
+
+Activation itself is guarded on mise existing (ZSH-R-13a). A guard on whether a
+command exists is not an operating-system conditional and is not what GEN-R-8
+prohibits: GEN-R-8 targets branching on the platform, which is dead code in a
+Fedora-only repository, whereas this branches on whether setup has run yet -
+the normal state of the fresh notebook this repository exists to configure. The
+same idiom is used at `setup:14` and `test/run.sh:29`. See GEN-R-8b.
 
 ### 5.5 Freshness strategy for build tasks
 
@@ -194,10 +244,18 @@ Therefore:
 1. Set `task.source_freshness_hash_contents = true` to hash contents instead
    of trusting mtime.
 2. **Key build freshness on a version stamp, not the source tree.** Each build
-   task takes a single-line file (`.build/nvim.version` containing `v0.11.6`)
-   as its only `source`, and a single binary as its only `output`. This
-   expresses the intent exactly - rebuild when the pin changes - and sidesteps
-   all three failure modes plus the cost of scanning a large source tree.
+   task takes a single file (`.build/nvim.version`, holding the pinned version
+   and the install prefix) as its only `source`, and a single binary as its
+   only `output`. This expresses the intent exactly - rebuild when the pin
+   changes - and sidesteps all three failure modes plus the cost of scanning a
+   large source tree.
+3. **Write the stamp from a separate, ungated task that runs first**
+   (`nvim-stamp`, GEN-R-18, NVIM-R-10). A stamp written inside the gated build
+   cannot invalidate the gate that guards it: the write happens only after mise
+   has already decided whether to run the task, so a version bump would never
+   rebuild. Because `source_freshness_hash_contents` compares content and the
+   stamp is a pure function of the pin and the prefix, an unchanged pin
+   reproduces the same bytes and the build is still correctly skipped.
 
 Note mise automatically includes the config file itself in `sources`, so
 editing `mise.toml` correctly invalidates dependent tasks.
@@ -208,7 +266,8 @@ failed forced rerun no longer leaves an auto-output marker behind (PR #10953).
 
 ## 6. Source pins
 
-Submodules are removed and split by role.
+Submodules are superseded, and their sources split by role. Deleting the
+gitlinks themselves is section 9 step 4, which has not run.
 
 ### 6.1 Build inputs - fetch release tarball, verify sha256
 
@@ -250,6 +309,25 @@ pin, so an explicit ref must be recorded or these silently start tracking
 | cmakelib-component-storage | `v1.0.0` | tag |
 
 `cmconf` is the currently-orphaned gitlink; it is declared properly here.
+zsh-autosuggestions is fetched to `zsh/custom/plugins/zsh-autosuggestions`
+rather than to `vendor/`, for the reason given in section 4.
+
+**Fetching never destroys a path it did not create** (GEN-R-17, GEN-R-17a).
+The fetch step refuses, without deleting, if the target path is a registered
+submodule of this repository or a git work tree with uncommitted changes, and
+it fails naming the path. The refusal covers `checkout --force` as well as
+`rm -rf`, because a forced checkout discards uncommitted work just as
+effectively. This matters concretely while the migration is incomplete: the
+submodules are still present in the working tree, and two of them are dirty, so
+an ordering assumption is not a safeguard. A clean clone already at the pinned
+ref is reused in place and not re-fetched, which is also what keeps the step a
+no-op on a second run.
+
+The same principle governs deployment: `link` refuses to replace a `$HOME`
+target that exists and is not already a symlink into this repository, and
+replaces an existing correct symlink silently so re-runs stay idempotent
+(GEN-R-17b, KITTY-R-4). The harness runs in a throwaway container, so the loss
+this prevents is one the tests could never show.
 
 **ohmyzsh must be a git clone, not a tarball.** Verified against ohmyzsh's own
 `tools/check_for_upgrade.sh`: it aborts with "Can't update: not a git
@@ -271,8 +349,17 @@ Two further ohmyzsh constraints taken from its `tools/install.sh`:
 
 `zsh/muse_theme.patch` is dropped. Patching a freshly fetched tree is not
 idempotent and breaks whenever upstream moves. The patched theme is instead
-committed as `zsh/custom/themes/muse.zsh-theme`; `ZSH_CUSTOM` already points at
-`zsh/custom`, and the directory exists for this purpose.
+extracted once from the pinned Oh My Zsh checkout, with the single change the
+patch made, and committed as `zsh/custom/themes/muse.zsh-theme`; `ZSH_CUSTOM`
+already points at `zsh/custom`, and the directory exists for this purpose. The
+committed file is the only remaining copy of that change, and the patch file is
+deleted (ZSH-R-4).
+
+`ZSH_CUSTOM` gets its own template placeholder, `___ZSH_CUSTOM_DIR___`
+(ZSH-R-14). It cannot share the framework-path placeholder: the framework is
+fetched runtime content under `vendor/` while the custom directory is committed
+repository content under `zsh/`, and one placeholder cannot yield two unrelated
+roots.
 
 ## 7. Managed inventory
 
@@ -293,13 +380,14 @@ Bottles, TeXstudio, OnlyOffice, JOSM, GitKraken, Krita, Flatseal, GNOME
 Extensions, Extension Manager, Arduino IDE2, Tellico. All tier 1 (Flatpak),
 installed **system-wide** - see 7.2.
 
-Template placeholders. Three are ported, two are **deleted**:
+Template placeholders. Two are ported, one is **added**, three are **deleted**:
 
 | Placeholder | Disposition |
 |---|---|
 | `___CMAKELIB_DIR___` | deleted - cmakelib's environment moves to the tool layer, see below |
 | `___OHMYZSH_PROJECT_DIR___` | ported |
 | `___VIM_BASE_DIR___` | ported |
+| `___ZSH_CUSTOM_DIR___` | added - the custom directory is a second, unrelated root (ZSH-R-14) |
 | `___USER_BIN_DIR___` | deleted - superseded by mise shell activation (ZSH-R-10) |
 | `___GO_BIN_DIR___` | deleted - superseded by mise shell activation (GO-R-2) |
 
@@ -386,9 +474,10 @@ Documentation is part of the work, not a by-product of it. The full set:
 | `docs/requirements/tool-kitty.md` | written |
 | `docs/requirements/tool-desktop-apps.md` | written |
 | `docs/adding-a-new-tool.md` - the explicit procedure | written |
-| `mise.toml` - the single pin and task file | pending |
-| `./setup` - bootstrap wrapper | pending |
-| Converted templates, extracted theme, `.gitignore` | pending |
+| `mise.toml` - the single pin and task file | written |
+| `./setup` - bootstrap wrapper | written |
+| Converted templates, extracted theme, `.gitignore` | written |
+| `test/` - containerised verification harness | written |
 
 The requirements documents are normative: `mise.toml` implements them, and
 GEN-R-13 requires a document per managed tool. Adding a tool without its
@@ -405,6 +494,17 @@ Separate, revertable commits:
 4. `git rm` the 9 gitlinks, delete `.gitmodules`, `rm -rf .git/modules/*`.
 5. Delete the 14 shell scripts and `lib.sh`.
 6. Commit `zsh/custom/themes/muse.zsh-theme`, delete `muse_theme.patch`.
+
+**Status.** Steps 1, 2, 3 and 6 are done, in that order, task by task through
+the containerised harness. Steps 4 and 5 - the removal of the submodules and of
+the legacy shell scripts - are **paused by an explicit decision and have not
+run**: all 9 gitlinks, `.gitmodules` and all 14 shell scripts are still present
+in the working tree, and two submodule checkouts are dirty. Nothing in these
+documents should be read as asserting otherwise. Two consequences follow while
+that remains true: the fetch step's refusal to touch a registered submodule
+(6.2) is load-bearing rather than theoretical, and `zsh/setup.sh` is broken,
+because it still references the deleted `zsh/template/config_template` and the
+removed placeholders. Both are resolved by steps 4 and 5 when they run.
 
 ## 10. Acceptance criteria
 
@@ -437,8 +537,12 @@ Separate, revertable commits:
 
 ## 11. Residual risks
 
-- **RR1 (medium): `[system]` is experimental and mid-rename.** Mitigation: the
-  5.2 fallback to plain dnf/flatpak tasks; the DAG does not change.
+- **RR1 (medium): the bootstrap subsystem is experimental.** The rename part of
+  this risk has materialised and is resolved: the interface is
+  `[bootstrap.packages]` and `mise bootstrap packages apply`, not the names
+  this document originally recorded (5.2, GEN-A-8). What remains is that an
+  experimental subsystem may change again. Mitigation: the 5.2 fallback to
+  plain dnf/flatpak tasks; the DAG does not change.
 - **RR2 (low): mise freshness bugs.** Two relevant upstream bugs are still
   open (#7656 multiple outputs, #4209 deleted sources). Mitigated by the
   single-source/single-output version-stamp design in 5.5, which avoids both.
@@ -446,6 +550,21 @@ Separate, revertable commits:
   non-default layout.** Must be exported by the wrapper, never from `[env]`.
 - **RR4 (low): tag/SHA pins are not checksummed** for the git-cloned content,
   unlike the tarballs. Accepted; SHAs are immutable in practice.
+- **RR5 (medium): the flatpak apply path is never exercised in a container.**
+  The harness proves the Flathub remote exists, is unfiltered, and resolves all
+  17 application IDs; it never installs them. A resolvable ID can still fail to
+  install for reasons no check covers - disk space, architecture, runtime
+  conflicts - and the first real signal comes from the user's own machine. A
+  real `flatpak install --system` needs a working system bus the sandboxed
+  container does not have, so nothing cheap closes this. Bounded by the fact
+  that the same apply mechanism is proven with `--manager dnf`. See APPS-A-9.
+- **RR6 (low): the login-shell change needs an absolute path and elevation with
+  `PATH` forwarded.** `login_shell` must be `/usr/bin/zsh`; mise rejects the
+  bare name. Applying it requires
+  `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
+  authenticates through PAM and sudo's `secure_path` drops `$APP_DIR/bin`. The
+  apply is unconditional, so it asks for elevation on every run even when the
+  shell is already set. See ZSH-A-8 and ZSH-A-9.
 
 Resolved during validation, in order of discovery: ohmyzsh tarball breakage
 (now specified as a git clone, 6.2); Neovim tarball version stamping (safe at
@@ -454,5 +573,8 @@ v0.11.6, 6.1); Go and ghcup as unmanaged dependencies (7.1); the `ag` and
 and finally APPS-A-5 - mise does not configure Flatpak remotes, which added the
 `flathub` step and its ordering constraint (5.3, 7.2).
 
-**No open assumptions and no open decisions remain.** The four risks above are
+Resolved during implementation: the mise interface naming (5.2, RR1), which was
+the one factual claim in this document that the pinned binary contradicted.
+
+**No open assumptions and no open decisions remain.** The six risks above are
 accepted with mitigations, not unknowns.

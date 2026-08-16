@@ -153,6 +153,13 @@ Do not write an operating-system conditional anywhere (GEN-R-8). Fedora is the
 only target, so a branch on the operating system is dead code by construction.
 Declare the Fedora package name and nothing else.
 
+A guard on whether a *command exists* is a different thing and is allowed
+(GEN-R-8b). It does not branch on the platform; it branches on whether setup
+has run yet, which is the normal state of a fresh notebook, a restored set of
+dotfiles, or a wiped application directory. Use one where the absent command
+would otherwise produce an error on every shell start or every harness run, and
+nowhere else.
+
 ---
 
 ## Step 5 - Declare inputs and outputs explicitly
@@ -212,10 +219,39 @@ that make the work look permanently stale, scanning a large tree is slow, and
 the orchestrator has known open defects around multiple outputs and deleted
 inputs. One input, one output, keyed on the version, avoids all of it.
 
+**Write the stamp from a separate step that always runs, ahead of the gated
+work** (GEN-R-18). A task cannot write the file its own freshness gate reads:
+the write happens only after the orchestrator has decided to run the task, so
+the version bump the stamp exists to catch would never trigger a rebuild. Keep
+the stamp's content a pure function of the pin, so an unchanged pin reproduces
+the same bytes and the gate still skips.
+
 For cheap, safe steps - creating a link, writing a rendered file - freshness
 tracking is unnecessary. Make the operation naturally repeatable instead: create
-parent directories first, and replace existing targets rather than failing on
-them.
+parent directories first, and replace a target your own setup created rather
+than failing on it - but only that target; see Step 8a.
+
+---
+
+## Step 8a - Never destroy what you did not create
+
+Any step that removes or force-overwrites a path must first establish that the
+path is its own (GEN-R-17). If it is not, fail, name the path, and change
+nothing. That message is part of the behaviour, not diagnostic output.
+
+Two concrete rules, both learned the hard way here:
+
+- **Fetching** refuses a path that is a registered submodule of this repository
+  or a work tree with uncommitted changes, and the refusal covers a forced
+  checkout as well as a recursive delete - a forced checkout discards
+  uncommitted work just as effectively (GEN-R-17a).
+- **Deploying** refuses a target in the home directory that exists and is not
+  already a symbolic link into this repository, while replacing an existing
+  correct symbolic link silently so re-runs stay idempotent (GEN-R-17b).
+
+The verification harness runs in a throwaway container, so it can never show
+you this class of damage. Ordering the tasks so the dangerous case "cannot
+happen" is not a safeguard either; only the refusal is.
 
 ---
 
@@ -243,6 +279,12 @@ is storing state in the wrong place.
 
 Every requirement needs an observable check (GEN-R-12). A requirement you cannot
 check is a preference; move it to prose.
+
+Verification runs in the containerised harness, which takes both a check-set
+name and the single task to run: it never runs the aggregate task, because that
+one installs roughly 15 GB of desktop applications no check needs. Name the
+task your tool adds, and let its declared predecessors pull in the rest
+(GEN-R-15).
 
 At minimum, confirm:
 
@@ -273,8 +315,9 @@ Copy this into the pull request or commit message.
 - [ ] Step 4 - No operating-system conditional anywhere
 - [ ] Step 5 - Inputs and outputs declared; nothing configured by another tool
 - [ ] Step 6 - Predecessors declared, not asserted at runtime
-- [ ] Step 7 - Freshness keyed on the pin for expensive work
+- [ ] Step 7 - Freshness keyed on the pin for expensive work, with the stamp written by a separate always-run step
 - [ ] Step 8 - Installs to the application directory via the setting
+- [ ] Step 8a - Every deletion or forced overwrite refuses paths it did not create
 - [ ] Step 9 - Two consecutive runs clean; verified from a clean state
 - [ ] `docs/requirements/README.md` index updated
 
