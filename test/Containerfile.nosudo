@@ -1,0 +1,23 @@
+FROM registry.fedoraproject.org/fedora:44
+
+# The unprivileged phase's prerequisites, baked in: this image stands for a
+# machine on which './setup system' has already run, which is what isolates
+# "the unprivileged phase needs no elevation" from "the privileged phase
+# installs the right things" - the latter is what test/Containerfile covers.
+# sudo is deliberately absent, so any elevation left in the unprivileged phase
+# fails the run rather than passing silently (GEN-R-19).
+RUN dnf -y install git curl gcc make ninja-build gettext glibc-gconv-extra flatpak \
+    && dnf clean all
+
+# Fedora's base image ships sudo, so omitting it from the install list is not
+# enough - it has to be removed. sudo is a protected package, hence the
+# override. The assertion is not decoration: if a future base image or a
+# dependency pulls sudo back in, this image would silently stop testing the
+# property it exists to test, and every unprivileged run would pass for the
+# wrong reason.
+RUN dnf -y remove sudo --setopt=protected_packages= && dnf clean all
+RUN ! command -v sudo
+
+RUN useradd -m tester
+USER tester
+WORKDIR /home/tester/repo
