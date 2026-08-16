@@ -22,6 +22,10 @@ podman run --rm -i \
         echo '--- second run (idempotence) ---'
         ./setup ${TARGET}
         export APP_DIR=\"\${APP_DIR:-\$HOME/App}\"
+        # Mirrors ./setup's own MISE_DATA_DIR export (GEN-A-7): ./setup ran as a
+        # child process above, so that export never reached this parent shell.
+        # This re-derives the same value rather than redefining it, and never
+        # runs outside throwaway container verification.
         export MISE_DATA_DIR=\"\$APP_DIR/mise\"
         PATH=\"\$APP_DIR/bin:\$PATH\"
         command -v mise >/dev/null && eval \"\$(mise env -s bash)\"
