@@ -42,6 +42,15 @@ not move anything or change the default.
 A single task can be run on its own by naming it, for example `./setup link`.
 `./setup preview` reports what a run would change without changing it.
 
+## Generated files
+
+`zsh/zshrc` and `vim/init.vim` are generated from the templates beside them and
+are not committed. Setup will not overwrite either one if its content differs
+from what the template renders to: it stops and names the file instead, because
+edits made directly to a generated file exist nowhere else. Put lasting changes
+in `zsh/template/zshrc_template` or `vim/template/init_template.vim` and re-run.
+An unchanged generated file is left untouched, so a repeat run stays a no-op.
+
 To add a tool, follow [docs/adding-a-new-tool.md](docs/adding-a-new-tool.md).
 
 [mise]: https://mise.jdx.dev
