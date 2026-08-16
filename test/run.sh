@@ -16,7 +16,16 @@ podman run --rm -i \
     -v "${REPO_ROOT}:/home/tester/repo:ro" \
     sysconfig-test bash -lc "
         set -euo pipefail
-        cp -r /home/tester/repo /home/tester/work
+        # A clone, not 'cp -r': the harness must test what is committed. A
+        # recursive copy drags in gitignored host state - a .build tree whose
+        # CMake cache holds host-absolute paths, populated vendor/ clones, an
+        # already-rendered zsh/zshrc - which would let fetch, render and nvim
+        # pass by reusing the host's work instead of doing their own. Cloning
+        # also keeps a real .git, which the tasks need (git rev-parse
+        # --show-toplevel) and the acceptance checks read (git ls-files -s,
+        # git grep), so seeding from a plain 'git archive' export is not
+        # enough. Uncommitted edits to tracked files are dropped on purpose.
+        git clone --quiet --no-hardlinks /home/tester/repo /home/tester/work
         cd /home/tester/work
         ./setup ${TARGET}
         echo '--- second run (idempotence) ---'

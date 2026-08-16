@@ -70,6 +70,17 @@ do not overlap: no templates or pins in the application directory, no installed
 artifacts in the repository. See GEN-D-13, GEN-R-1a, GEN-R-1b, GEN-R-1c in
 `requirements/general.md`.
 
+**Non-overlap is a constraint on where the repository is cloned, not only on
+what setup writes.** A checkout placed inside the application directory
+satisfies every requirement about file placement and still breaks GEN-R-3a:
+deleting the application directory to rebuild the environment would delete the
+repository, and with it anything else the user keeps there. `./setup` compares
+`git rev-parse --show-toplevel` against `$APP_DIR` and warns, naming both
+paths, once per run. It warns rather than refuses, and does not relocate the
+default: an overlapping layout still works, it only makes one documented
+recovery procedure destructive, and silently rewriting a user's install prefix
+would be the larger surprise. Recorded in the README as well.
+
 This also consolidates a split that exists today, where `setup.sh` installs
 binaries to `$HOME/Bin` while `lib.sh` points the Go SDK at
 `$HOME/App/go/go1.23.3` - two prefixes, one of them hardcoded.
@@ -199,6 +210,16 @@ Three ordering constraints are load-bearing:
   APPS-A-5: mise will not create the remote, so it must exist first. Scoping
   each step with a manager filter keeps them separable.
 
+**`render` refuses to overwrite a modified output.** The generated files
+(`zsh/zshrc`, `vim/init.vim`) are gitignored, so a hand edit to one of them
+exists in no template, no commit and no `git status` report. `render` produces
+the new bytes first and compares: identical means the file is not touched at
+all, which is what keeps the task a clean no-op on the second run; different
+means the task stops and names the path. This is the same answer `fetch` and
+`link` already give for vendored checkouts and `$HOME` targets, applied to the
+one location where the destroyed content would have been genuinely
+unrecoverable.
+
 ### 5.4 PATH contract
 
 The rendered zshrc exposes installed tools via the orchestrator's shell
@@ -268,6 +289,27 @@ failed forced rerun no longer leaves an auto-output marker behind (PR #10953).
 
 Submodules are superseded, and their sources split by role. Deleting the
 gitlinks themselves is section 9 step 4, which has not run.
+
+### 6.0 The orchestrator itself
+
+mise is a pinned source like any other, and for a while it was the only one
+that was not: `./setup` piped `https://mise.run` with no version, while the
+whole design depends on `[bootstrap.packages]` and `mise bootstrap packages
+apply` - an experimental interface that has already been renamed once under
+this repository (RR1, GEN-A-8). An unpinned orchestrator means an upstream
+release can change that interface between two runs of a script whose purpose
+is reproducibility.
+
+The pin is `min_version = "2026.8.6"` at the top of `mise.toml`, so acceptance
+criterion 5 holds for the orchestrator too. It has two readers, deliberately:
+
+- mise itself enforces it at run time, refusing to load the config with an
+  older binary.
+- `./setup` extracts the same line with `sed` and passes it to the installer as
+  `MISE_VERSION`. The wrapper runs *before* mise exists, so it cannot ask mise
+  to parse its own config; reading the file directly is the only way to keep
+  the pin in `mise.toml` instead of duplicating it as a shell constant, which
+  GEN-R-7 forbids.
 
 ### 6.1 Build inputs - fetch release tarball, verify sha256
 
@@ -515,7 +557,8 @@ regression guard rather than a live safeguard, and it is retained as such.
 3. `git submodule status` reports nothing.
 4. No file outside the repository and the application directory except the
    three symlinks and their parent dirs.
-5. Every version pin appears in `mise.toml`.
+5. Every version pin appears in `mise.toml`, including mise's own
+   (`min_version`, see 6.0).
 6. `nvim --version` reports `v0.11.6`, build type RelWithDebInfo.
 7. `omz update` works (proves ohmyzsh kept a usable `.git`).
 8. `zsh` is the login shell without a manual `chsh`.

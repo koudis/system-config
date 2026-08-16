@@ -1,3 +1,9 @@
+# The orchestrator's own pin (GEN-R-7: pins live here and nowhere else).
+# mise enforces this at run time; ./setup reads the same line with sed to
+# decide which release to install, because it runs before mise exists and so
+# cannot ask mise to parse this file.
+min_version = "2026.8.6"
+
 [settings]
 experimental = true
 
@@ -98,6 +104,12 @@ sudo flatpak remote-add --if-not-exists flathub \
 depends = ["flathub"]
 run = "mise bootstrap packages apply --yes --manager flatpak"
 
+# Decorative by mise's design, kept deliberately: mise installs everything in
+# [tools] before it runs any task at all, so `mise install` here has nothing
+# left to do and depends = ["packages"] gates nothing - `./setup fetch` on a
+# fresh box downloads both SDKs on the way to fetching. Removing the task would
+# leave no way to ask for the SDK step alone, which is what [tasks.all] and the
+# harness (`test/run.sh tools tools`) name, so it stays as that entry point.
 [tasks.tools]
 depends = ["packages"]
 run = "mise install"
@@ -117,6 +129,22 @@ refuse_if_submodule() {
         echo "fetch: refusing to touch $dir: registered as a git submodule" >&2
         exit 1
     fi
+}
+# R25 again, for the case the submodule and dirty guards both miss: a plain
+# directory that has content but no .git was not left behind by this task (a
+# clone always leaves a .git behind), so it is somebody's own data rather than
+# a stale checkout to be replaced. Same for a file or symlink in the way.
+refuse_if_unregistered_content() {
+    local dir="$1"
+    if [[ -d $dir ]]; then
+        if [[ -n $(ls -A "$dir" 2>/dev/null) ]]; then
+            echo "fetch: refusing to replace $dir: not a git work tree and not empty" >&2
+            exit 1
+        fi
+        return
+    fi
+    echo "fetch: refusing to replace $dir: exists and is not a directory" >&2
+    exit 1
 }
 refuse_if_dirty() {
     local dir="$1"
@@ -139,7 +167,10 @@ refuse_if_dirty() {
 fetch_pinned() {
     local dir="$1" url="$2" ref="$3"
     if [[ ! -e $dir/.git ]]; then
-        [[ -e $dir ]] && refuse_if_submodule "$dir"
+        if [[ -e $dir || -L $dir ]]; then
+            refuse_if_submodule "$dir"
+            refuse_if_unregistered_content "$dir"
+        fi
         rm -rf "$dir"
         git clone --quiet "$url" "$dir"
     fi
@@ -209,21 +240,56 @@ make CMAKE_INSTALL_PREFIX="$APP_DIR" install
 """
 
 # No sources/outputs (R12): mise has open upstream bugs where freshness
-# misfires with multiple outputs, and the body is two copies plus three seds -
-# always running it is idempotent by construction and, unlike a freshness gate,
-# also overwrites output left behind by the retired shell scripts.
+# misfires with multiple outputs, and the body is two renders - always running
+# it is idempotent by construction and, unlike a freshness gate, also
+# overwrites output left behind by the retired shell scripts.
+#
+# R25 has its most consequential case here. zsh/zshrc and vim/init.vim are
+# gitignored, so anything the user added to them by hand exists in no template
+# and no commit, and `git status` cannot warn about it either. The old
+# unconditional `cp` destroyed it on the first run. Now the rendered bytes are
+# produced first and compared: an output that already matches is left strictly
+# alone (no rewrite, no message, clean second run), and an output that differs
+# stops the task by name.
+#
+# Refusing rather than copying the file aside is the same answer the fetch and
+# link guards give, and R25 is a rule about not deciding on the user's behalf:
+# a refusal is a decision the user has to make once, whereas a `.pre-mise`
+# neighbour is a second copy nobody reads, needs its own rule for what happens
+# when it already exists, and leaves the user's real content out of the file
+# that is actually loaded anyway. The message is required for correctness, not
+# decoration - the path it names is the only pointer to content that exists
+# nowhere else.
 [tasks.render]
 depends = ["fetch"]
 run = """
 set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 
-cp zsh/template/zshrc_template    zsh/zshrc
-cp vim/template/init_template.vim vim/init.vim
+trap 'rm -f zsh/zshrc.mise-new vim/init.vim.mise-new' EXIT
 
-sed -i "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g"    zsh/zshrc
-sed -i "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g"     zsh/zshrc
-sed -i "s|___VIM_BASE_DIR___|${root}/vim|g"              vim/init.vim
+render() {
+    local template="$1" out="$2" new="$2.mise-new"
+    sed -e "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g" \
+        -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
+        -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
+        "$template" > "$new"
+    if [[ -e $out ]] && cmp -s "$new" "$out"; then
+        rm -f "$new"
+        return
+    fi
+    if [[ -e $out || -L $out ]]; then
+        rm -f "$new"
+        echo "render: refusing to overwrite $out: its content differs from $template rendered" >&2
+        echo "render: $out is gitignored, so those edits exist nowhere else; move them into $template" >&2
+        echo "render: (or move the file aside), then re-run" >&2
+        exit 1
+    fi
+    mv "$new" "$out"
+}
+
+render zsh/template/zshrc_template    zsh/zshrc
+render vim/template/init_template.vim vim/init.vim
 """
 
 # R25 applies here too: a target that already exists and is not a symlink

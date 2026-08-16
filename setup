@@ -6,7 +6,36 @@ set -euo pipefail
 export APP_DIR="${APP_DIR:-$HOME/App}"
 export MISE_DATA_DIR="$APP_DIR/mise"
 
+root="$(git rev-parse --show-toplevel)"
+
+# GEN-R-1c and spec section 4: the repository and the application directory
+# must not overlap. When they do, GEN-R-3a ("delete the application directory
+# and re-run setup") stops being a safe instruction, because carrying it out
+# would delete this repository along with everything else the user keeps under
+# APP_DIR. The default is deliberately left alone - relocating a user's install
+# prefix behind their back is worse than saying so once per run.
+case "$root/" in
+    "$APP_DIR"/*)
+        echo "setup: warning: this repository ($root) is inside APP_DIR ($APP_DIR)." >&2
+        echo "setup: the two must not overlap - deleting APP_DIR to rebuild the" >&2
+        echo "setup: environment would delete this repository with it." >&2
+        echo "setup: move the repository out of APP_DIR, or export APP_DIR to a" >&2
+        echo "setup: directory that does not contain it." >&2
+        ;;
+esac
+
 mkdir -p "$APP_DIR" "$MISE_DATA_DIR"
+
+# The mise release is pinned in mise.toml like every other pin (GEN-R-7),
+# as min_version. mise enforces it once it is running; this script runs before
+# mise exists and therefore cannot ask mise to parse its own config, so it
+# reads the same line with sed. One declaration, two readers - a bare constant
+# here would be the second pin location the spec forbids.
+mise_version="$(sed -n 's/^min_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$root/mise.toml" | head -1)"
+if [ -z "$mise_version" ]; then
+    echo "setup: no min_version pin found in $root/mise.toml" >&2
+    exit 1
+fi
 
 # command -v only sees mise if it is already on PATH, which a prior run of
 # this same script cannot guarantee for the current process; check the known
@@ -14,12 +43,13 @@ mkdir -p "$APP_DIR" "$MISE_DATA_DIR"
 if ! command -v mise >/dev/null 2>&1 && [ ! -x "$APP_DIR/bin/mise" ]; then
     # MISE_INSTALL_PATH must name a file, not a directory; the installer
     # errors out if given a directory.
-    curl -fsSL https://mise.run | MISE_INSTALL_PATH="$APP_DIR/bin/mise" sh
+    curl -fsSL https://mise.run \
+      | MISE_VERSION="v${mise_version}" MISE_INSTALL_PATH="$APP_DIR/bin/mise" sh
 fi
 export PATH="$APP_DIR/bin:$PATH"
 
 # mise refuses to load an untrusted config file. Without this, the first run on
 # a fresh machine either prompts or does nothing.
-mise trust "$(git rev-parse --show-toplevel)/mise.toml"
+mise trust "$root/mise.toml"
 
 exec mise run "${@:-all}"
