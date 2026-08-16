@@ -66,7 +66,9 @@ ENABLE_CORRECTION="true"
 # HIST_STAMPS="mm/dd/yyyy"
 
 # Would you like to use another custom folder than $ZSH/custom?
-ZSH_CUSTOM=${ZSH_PROJECT_DIR}/custom
+# Its own placeholder: the custom directory lives in the repository, not
+# beside the vendored upstream checkout ZSH_PROJECT_DIR points at.
+ZSH_CUSTOM=___ZSH_CUSTOM_DIR___
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
@@ -135,15 +137,22 @@ unsetopt BEEP
 setopt EXTENDED_HISTORY
 setopt hist_ignore_all_dups
 
-PATH="___USER_BIN_DIR___:___GO_BIN_DIR___:${PATH}"
+# Tool visibility comes from mise activation, which covers every installed
+# artifact at once. mise reads MISE_DATA_DIR at process start, so it cannot be
+# supplied by mise.toml's [env]: an interactive shell that fails to export it
+# here installs outside the application directory. ./setup exports the same
+# pair for its own process; a login shell is the second place that legitimately
+# needs them.
+export APP_DIR="${APP_DIR:-$HOME/App}"
+export MISE_DATA_DIR="$APP_DIR/mise"
+export PATH="$APP_DIR/bin:$PATH"
+eval "$(mise activate zsh)"
 
 HISTFILE="$HOME/.zsh_history"
 HISTSIZE=100000
 SAVEHIST=10000000
 
 bindkey -v
-
-source "${ZSH_PROJECT_DIR}/config"
 
 #
 # Simplify direnv handling for python3 projects
@@ -156,8 +165,3 @@ autovenv() {
     echo "PROMPT=\"(VENV)${PROMPT}\"" >> .envrc
     direnv allow .
 }
-
-#
-# Ensure the .gchjup is loaded...
-#
-[ -f "/home/h/.ghcup/env" ] && . "/home/h/.ghcup/env" # ghcup-env

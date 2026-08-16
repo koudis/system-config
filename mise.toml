@@ -208,8 +208,26 @@ make CMAKE_BUILD_TYPE=RelWithDebInfo \
 make CMAKE_INSTALL_PREFIX="$APP_DIR" install
 """
 
+# No sources/outputs (R12): mise has open upstream bugs where freshness
+# misfires with multiple outputs, and the body is two copies plus three seds -
+# always running it is idempotent by construction and, unlike a freshness gate,
+# also overwrites output left behind by the retired shell scripts.
+[tasks.render]
+depends = ["fetch"]
+run = """
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+
+cp zsh/template/zshrc_template    zsh/zshrc
+cp vim/template/init_template.vim vim/init.vim
+
+sed -i "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g"    zsh/zshrc
+sed -i "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g"     zsh/zshrc
+sed -i "s|___VIM_BASE_DIR___|${root}/vim|g"              vim/init.vim
+"""
+
 [tasks.all]
-depends = ["packages", "apps", "tools", "fetch", "nvim"]
+depends = ["packages", "apps", "tools", "fetch", "nvim", "render"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
