@@ -102,8 +102,39 @@ run = "mise bootstrap packages apply --yes --manager flatpak"
 depends = ["packages"]
 run = "mise install"
 
+[tasks.fetch]
+run = """
+set -euo pipefail
+umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
+mkdir -p vendor zsh/custom/plugins
+
+# Re-fetches only when the work tree isn't already at the pinned ref, so a
+# second run touches the network for nothing (idempotence).
+fetch_pinned() {
+    local dir="$1" url="$2" ref="$3"
+    if [[ ! -d $dir/.git ]]; then
+        rm -rf "$dir"
+        git clone --quiet "$url" "$dir"
+    fi
+    if [[ $(git -C "$dir" rev-parse HEAD) != "$ref" ]]; then
+        git -C "$dir" fetch --quiet --tags origin
+        git -C "$dir" checkout --quiet --force "$ref"
+    fi
+}
+
+fetch_pinned vendor/ohmyzsh https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH_REF"
+# Oh My Zsh resolves custom plugins only under $ZSH_CUSTOM/plugins/, so this
+# clones to its real load path rather than vendor/ plus a symlink (R9).
+fetch_pinned zsh/custom/plugins/zsh-autosuggestions https://github.com/zsh-users/zsh-autosuggestions.git "$AUTOSUGGEST_REF"
+fetch_pinned vendor/cmakelib https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
+fetch_pinned vendor/cmakelib-component-cmconf  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
+fetch_pinned vendor/cmakelib-component-cmdef   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
+fetch_pinned vendor/cmakelib-component-cmutil  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
+fetch_pinned vendor/cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
+"""
+
 [tasks.all]
-depends = ["packages", "apps", "tools"]
+depends = ["packages", "apps", "tools", "fetch"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
