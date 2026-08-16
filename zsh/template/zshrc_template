@@ -146,7 +146,10 @@ setopt hist_ignore_all_dups
 export APP_DIR="${APP_DIR:-$HOME/App}"
 export MISE_DATA_DIR="$APP_DIR/mise"
 export PATH="$APP_DIR/bin:$PATH"
-eval "$(mise activate zsh)"
+# Guarded the same way setup and the harness guard theirs: on a machine where
+# ./setup has not run yet, mise is absent and every shell start would otherwise
+# report it.
+command -v mise >/dev/null && eval "$(mise activate zsh)"
 
 HISTFILE="$HOME/.zsh_history"
 HISTSIZE=100000

@@ -2,7 +2,7 @@
 assert_cmd "zshrc rendered"    test -f zsh/zshrc
 assert_cmd "init.vim rendered" test -f vim/init.vim
 assert_cmd "no unsubstituted tokens" \
-    bash -c '! grep -rq "___[A-Z_]*___" zsh/zshrc vim/init.vim'
+    bash -c '! grep -rqE "___[A-Za-z0-9_]+___" zsh/zshrc vim/init.vim'
 # The harness user is "tester", so any /home/h is a leftover literal from the
 # old templates (the ghcup line) rather than the rendering root.
 assert_cmd "no hardcoded username in rendered output" \
@@ -28,9 +28,12 @@ assert_cmd "zshrc yields MISE_DATA_DIR under APP_DIR" bash -c '
     v=$(env -u APP_DIR -u MISE_DATA_DIR bash -c \
         "eval \"\$(grep -E \"^export (APP_DIR|MISE_DATA_DIR)=\" zsh/zshrc)\"; printf %s \"\$MISE_DATA_DIR\"")
     [[ $v == "$HOME/App/mise" ]]'
+# Both line numbers must exist: with an empty operand [[ "" -lt 149 ]] is true,
+# so a deleted export would otherwise satisfy the ordering test.
 assert_cmd "MISE_DATA_DIR exported before mise is activated" bash -c '
-    [[ $(grep -n "^export MISE_DATA_DIR=" zsh/zshrc | cut -d: -f1) -lt \
-       $(grep -n "mise activate zsh"      zsh/zshrc | cut -d: -f1) ]]'
+    d=$(grep -n "^export MISE_DATA_DIR=" zsh/zshrc | head -1 | cut -d: -f1)
+    a=$(grep -n "mise activate zsh"      zsh/zshrc | head -1 | cut -d: -f1)
+    [[ -n $d && -n $a && $d -lt $a ]]'
 
 # Step 4a: the cmakelib exports moved to mise.toml [env], so neither the
 # fragment nor its rendered output may come back.
