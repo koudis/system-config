@@ -98,8 +98,12 @@ sudo flatpak remote-add --if-not-exists flathub \
 depends = ["flathub"]
 run = "mise bootstrap packages apply --yes --manager flatpak"
 
+[tasks.tools]
+depends = ["packages"]
+run = "mise install"
+
 [tasks.all]
-depends = ["packages", "apps"]
+depends = ["packages", "apps", "tools"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
