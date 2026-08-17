@@ -152,7 +152,8 @@ fi
 # left to do and depends = ["preflight"] gates nothing - `./setup fetch` on a
 # fresh box downloads both SDKs on the way to fetching. Removing the task would
 # leave no way to ask for the SDK step alone, which is what [tasks.all] and the
-# harness (`test/run.sh tools tools`) name, so it stays as that entry point.
+# harness (`test/run.sh tools tools unprivileged`) name, so it stays as that
+# entry point.
 [tasks.tools]
 depends = ["preflight"]
 run = "mise install"
@@ -387,7 +388,7 @@ set -euo pipefail
 mise run --dry-run all
 installed=$(flatpak list --user --columns=application 2>/dev/null || true)
 for app in $FLATPAK_APPS; do
-    grep -qx "$app" <<<"$installed" || echo "would install: $app"
+    grep -Fqx "$app" <<<"$installed" || echo "would install: $app"
 done
 """
 
