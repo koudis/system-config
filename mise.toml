@@ -27,6 +27,18 @@ CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
 CMLIB_DIR                       = "{{config_root}}/_vendor/cmakelib"
 CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{config_root}}/_vendor/"
 
+# The seventeen desktop applications (APPS-R-11: they live here and nowhere
+# else, so GEN-R-7 still holds now that they are no longer in
+# [bootstrap.packages]). Read by [tasks.apps] and by [tasks.preview].
+FLATPAK_APPS = """
+org.kicad.KiCad org.freecad.FreeCAD net.ankiweb.Anki md.obsidian.Obsidian
+com.prusa3d.PrusaSlicer com.jgraph.drawio.desktop com.usebottles.bottles
+org.texstudio.TeXstudio org.onlyoffice.desktopeditors org.openstreetmap.josm
+com.axosoft.GitKraken org.kde.krita com.github.tchx84.Flatseal
+org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2
+org.kde.tellico
+"""
+
 [tools]
 cmake = "3.30.1"
 go    = "1.23.3"
@@ -55,31 +67,9 @@ login_shell = "/usr/bin/zsh"
 "dnf:git"                 = "latest"
 "dnf:flatpak"             = "latest"
 
-# flatpak entries in the same table (R6: mise forbids a second
-# [bootstrap.packages] header). "flatpak" (not "flatpak-user") is system
-# scope (APPS-R-6). "latest" is mandatory - the manager rejects version
-# pins (APPS-A-1).
-"flatpak:org.kicad.KiCad"                  = "latest"
-"flatpak:org.freecad.FreeCAD"              = "latest"
-"flatpak:net.ankiweb.Anki"                 = "latest"
-"flatpak:md.obsidian.Obsidian"             = "latest"
-"flatpak:com.prusa3d.PrusaSlicer"          = "latest"
-"flatpak:com.jgraph.drawio.desktop"        = "latest"
-"flatpak:com.usebottles.bottles"           = "latest"
-"flatpak:org.texstudio.TeXstudio"          = "latest"
-"flatpak:org.onlyoffice.desktopeditors"    = "latest"
-"flatpak:org.openstreetmap.josm"           = "latest"
-"flatpak:com.axosoft.GitKraken"            = "latest"
-"flatpak:org.kde.krita"                    = "latest"
-"flatpak:com.github.tchx84.Flatseal"       = "latest"
-"flatpak:org.gnome.Extensions"             = "latest"
-"flatpak:com.mattjakeman.ExtensionManager" = "latest"
-"flatpak:cc.arduino.IDE2"                  = "latest"
-"flatpak:org.kde.tellico"                  = "latest"
-
-# --manager dnf keeps this scoped: the apps task below applies the flatpak
-# entries from the same [bootstrap.packages] table, and those must not
-# install before the Flathub remote exists.
+# --manager dnf is not required for correctness now that this table holds
+# only dnf: entries (the flatpak: entries moved to FLATPAK_APPS and
+# [tasks.apps]). It stays because it states the scope at the call site.
 [tasks.packages]
 run = "mise bootstrap packages apply --yes --manager dnf"
 
@@ -101,19 +91,31 @@ run = 'sudo env "PATH=$PATH" mise bootstrap user apply --yes'
 depends = ["packages", "login-shell"]
 
 # mise does not create flatpak remotes (APPS-A-5), so this is an explicit
-# preceding step. Adding the remote manually (rather than via Fedora's
-# flatpak-remote package) is what removes Fedora's default filter
-# (APPS-A-7). --if-not-exists makes it idempotent (APPS-R-8).
+# preceding step (APPS-R-7). Adding the remote manually, rather than via
+# Fedora's flatpak-remote package, is what removes Fedora's default filter
+# (APPS-A-7). --if-not-exists makes it idempotent (APPS-R-8), and --user is
+# what removes the elevation: a system remote is not visible to a --user
+# install, so the remote and the installs must share a scope.
 [tasks.flathub]
-depends = ["packages"]
+depends = ["preflight"]
 run = """
-sudo flatpak remote-add --if-not-exists flathub \
+flatpak remote-add --user --if-not-exists flathub \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 """
 
+# --or-update is load-bearing: a plain install on an application that is
+# already present warns and exits non-zero, which would fail the second-run
+# requirement (GEN-R-4). --or-update makes that case a silent no-op update.
+# flatpak's own progress output is the one place this repository emits status;
+# suppressing it during a multi-gigabyte download would be worse than the noise.
 [tasks.apps]
 depends = ["flathub"]
-run = "mise bootstrap packages apply --yes --manager flatpak"
+run = """
+set -euo pipefail
+for app in $FLATPAK_APPS; do
+    flatpak install --user --noninteractive --or-update flathub "$app"
+done
+"""
 
 # The unprivileged phase's system prerequisites. Blocking here rather than
 # letting the Neovim build fail on a missing compiler is the same
