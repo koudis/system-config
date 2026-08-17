@@ -376,8 +376,23 @@ depends = ["preflight", "apps", "tools", "fetch", "nvim", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
+# Split along the same seam as the phases: this one must stay runnable where
+# sudo does not exist, which is where checks-bootstrap.sh now exercises it.
+# The application half is hand-rolled because driving flatpak directly costs
+# the --dry-run the declarative table would have provided; it reads the same
+# FLATPAK_APPS list the install step reads.
 [tasks.preview]
 run = """
+set -euo pipefail
 mise run --dry-run all
+installed=$(flatpak list --user --columns=application 2>/dev/null || true)
+for app in $FLATPAK_APPS; do
+    grep -qx "$app" <<<"$installed" || echo "would install: $app"
+done
+"""
+
+[tasks.preview-system]
+run = """
+mise run --dry-run system
 mise bootstrap packages apply --dry-run --manager dnf
 """
