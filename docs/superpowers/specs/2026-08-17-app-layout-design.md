@@ -125,7 +125,6 @@ before wiring anything into a task.
 
 ```
 App/
-  bin/mise               orchestrator bootstrap only
   cmake/<version>/
   cmakelib/
     cmakelib/                     CMLIB_DIR
@@ -134,7 +133,9 @@ App/
     cmakelib-component-cmutil/
     cmakelib-component-storage/
   go/<version>/
-  mise/                  cache and state only, no installs
+  mise/
+    bin/mise             the orchestrator binary
+    <cache and state>    no installs
   nvim/
     bin/nvim
     lib64/nvim
@@ -143,8 +144,17 @@ App/
 ```
 
 The rule: **every managed tool owns one directory under the application
-directory, named after the tool.** `App/bin/` retains only the orchestrator
-binary, which bootstraps the others and is not itself a managed tool.
+directory, named after the tool** - the orchestrator included. Its binary
+moves into its own directory beside the cache and state it already keeps
+there, which retires `App/bin/` entirely. An earlier draft of this design
+kept `App/bin/` for the orchestrator alone, on the reasoning that it
+bootstraps the others and is not itself a managed tool; that carved out one
+exception to buy nothing, since the orchestrator already owns a directory
+named after it. The rule is now exceptionless.
+
+This leaves the search path naming two directories - `App/mise/bin` for the
+orchestrator and `App/nvim/bin` for the editor - and nothing else. Every other
+tool is resolved by the orchestrator rather than by path.
 
 `App/cmakelib/` holds the library and its components together, as requested.
 This also matches the library's own convention: it resolves components as
@@ -244,7 +254,8 @@ submodule case is covered.
 
 | Claim | Check |
 |---|---|
-| Layout | After setup, each managed tool has exactly one directory under the application directory named after it; the application root contains no `lib64` or `share` |
+| Layout | After setup, each managed tool has exactly one directory under the application directory named after it; the application root contains no `lib64`, `share` or `bin` |
+| Search path | The search path names exactly two application-directory entries, `mise/bin` and `nvim/bin`, and both exist |
 | Global visibility | An interactive shell started outside this repository resolves every pinned tool by name and reports the pinned version |
 | No system fallthrough | The same shell resolves `cmake` to the pinned version, not the system one |
 | One version | After a pin bump and a setup run, exactly one version of that tool is installed |
@@ -267,19 +278,17 @@ of this repository created is the kind of decision GEN-R-17 exists to refuse.
 already warns that the repository sits inside `~/App`, which this design does
 not change and does not worsen.
 
-## 8. Decisions taken without explicit confirmation
+## 8. Decisions confirmed after drafting
 
-**ohmyzsh moves to `App/ohmyzsh/`.** Asked twice, not answered.
+**ohmyzsh moves to `App/ohmyzsh/`.** Confirmed 2026-08-17.
 
 The argument originally offered for moving it - that it makes GEN-R-3 a single
 rule - does not survive F-7: `zsh-autosuggestions` cannot move, so the rule
 splits either way and the criterion in 4.1 has to be written regardless. What
-remains is weaker but still holds: ohmyzsh is ordinary fetched runtime content
+justifies the move is narrower: ohmyzsh is ordinary fetched runtime content
 under no fixed-path constraint, so leaving it in the repository would make it
 the one member of the exception that has not earned it, and would keep
 `_vendor/` alive for a single directory.
 
-If it stays, the changes are small and local: `_vendor/` survives, its
-`.gitignore` entry stays, the render placeholder keeps pointing into the
-repository, and the criterion in 4.1 gains a second member - which then needs
-its own recorded justification, because ZSH-A-7 does not cover it.
+**`App/bin/` is retired.** Confirmed 2026-08-17, after the draft above had
+kept it for the orchestrator alone. See 4.1.

@@ -27,16 +27,16 @@
 
 | File | Responsibility | Tasks |
 |---|---|---|
-| `mise.toml` | Pins, `[env]`, all tasks | 1, 3, 4, 5, 6, 7 |
-| `setup` | Process-start environment, orchestrator bootstrap | 4, 5 |
-| `zsh/template/zshrc_template` | Login-shell environment, activation | 3, 4, 5 |
-| `test/run.sh` | Container harness PATH | 5 |
-| `test/checks-*.sh` | Observable checks | 2, 3, 4, 5, 6, 7, 8 |
-| `.gitignore` | `_vendor/` entry | 6 |
-| `docs/requirements/general.md` | Definitions, global assumptions and requirements | 2, 3, 4, 5, 6 |
-| `docs/requirements/tool-*.md` | Per-tool requirements | 3, 4, 5, 6 |
+| `mise.toml` | Pins, `[env]`, all tasks | 1, 3, 6, 7, 8 |
+| `setup` | Process-start environment, orchestrator bootstrap | 4, 5, 6 |
+| `zsh/template/zshrc_template` | Login-shell environment, activation | 3, 4, 5, 6 |
+| `test/run.sh` | Container harness environment and PATH | 4, 5, 6 |
+| `test/checks-*.sh` | Observable checks | 2, 3, 4, 5, 6, 7, 8, 9 |
+| `.gitignore` | `_vendor/` entry | 7 |
+| `docs/requirements/general.md` | Definitions, global assumptions and requirements | 2, 3, 4, 5, 7, 8 |
+| `docs/requirements/tool-*.md` | Per-tool requirements | 3, 4, 6, 7 |
 | `docs/spec-mise-migration.md` | Superseded claims | 3 |
-| `README.md` | `_vendor/` references | 6 |
+| `README.md` | `_vendor/` migration notes | 7 |
 
 ---
 
@@ -400,7 +400,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: the export block established in Task 3.
-- Produces: `App/go/<version>/`, `App/cmake/<version>/`. Task 5 places `App/nvim/` beside them.
+- Produces: `App/go/<version>/`, `App/cmake/<version>/`. Tasks 5 and 6 place `App/mise/bin/` and `App/nvim/` beside them.
 
 - [ ] **Step 1: Write the failing check**
 
@@ -575,7 +575,7 @@ make CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" install
 
 - [ ] **Step 4: Put the new location on the search path**
 
-Neovim is the one managed tool the orchestrator does not resolve by name, so its directory joins the search path explicitly. In `setup`, replace line 49:
+Neovim is the one managed tool the orchestrator does not resolve by name, so its directory joins the search path explicitly. The orchestrator is still in `$APP_DIR/bin` at this point — Task 6 moves it — so that entry stays for now. In `setup`, replace line 49:
 
 ```bash
 export PATH="$APP_DIR/bin:$APP_DIR/nvim/bin:$PATH"
@@ -642,7 +642,142 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Move fetched runtime content
+### Task 6: Move the orchestrator binary and retire `App/bin/`
+
+Neovim left `App/bin/` in Task 5, so the orchestrator is now its only occupant. It already owns `App/mise/` for its cache and state, so its binary joins it there and `App/bin/` is retired — making the one-directory-per-tool rule exceptionless. This task runs *after* the Neovim move deliberately: retiring the directory while Neovim still lived in it would drop the editor off the search path and fail this task's own check.
+
+**Files:**
+- Modify: `setup:27`, `setup:43-49`
+- Modify: `zsh/template/zshrc_template` (the `PATH` export)
+- Modify: `test/run.sh:72`
+- Modify: `docs/requirements/general.md` (GEN-R-1a)
+- Modify: `test/checks-bootstrap.sh`
+
+**Interfaces:**
+- Consumes: the `App/<tool>/` convention from Task 4, and the `App/nvim/bin` search-path entry added by Task 5.
+- Produces: `App/mise/bin/mise` on the search path. These two are the only application-directory entries the search path names; no later task adds another.
+
+**Note:** `App/mise/` currently holds `downloads/`, `installs/`, `migrations/` and `shims/` — no `bin/`, so there is no collision. On a machine set up before this change, `App/bin/mise` still exists and may still be on `PATH`; the bootstrap guard below must therefore test the new path specifically, or setup will decide the orchestrator is already installed and never place it in its new home.
+
+- [ ] **Step 1: Write the failing check**
+
+Append to `test/checks-bootstrap.sh`:
+
+```bash
+assert_cmd "the orchestrator lives in its own directory" bash -c '
+    [ -x "${APP_DIR}/mise/bin/mise" ]
+'
+assert_cmd "no bare bin directory under APP_DIR" bash -c '
+    [ ! -e "${APP_DIR}/bin" ]
+'
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `test/run.sh bootstrap packages privileged`
+Expected: FAIL on both — the binary is still at `$APP_DIR/bin/mise`.
+
+- [ ] **Step 3: Move the bootstrap target**
+
+In `setup`, replace the install guard and the `PATH` line Task 5 left at line 49:
+
+```bash
+# command -v only sees mise if it is already on PATH, which a prior run of
+# this same script cannot guarantee for the current process; check the known
+# install path too, or every invocation redownloads mise over the network.
+# The test names the new path specifically: a machine set up before the
+# orchestrator moved still has a binary at the old one, and trusting
+# command -v alone would leave it there forever.
+if [ ! -x "$APP_DIR/mise/bin/mise" ]; then
+    # MISE_INSTALL_PATH must name a file, not a directory; the installer
+    # errors out if given a directory.
+    curl -fsSL https://mise.run \
+      | MISE_VERSION="v${mise_version}" MISE_INSTALL_PATH="$APP_DIR/mise/bin/mise" sh
+fi
+export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$PATH"
+```
+
+- [ ] **Step 4: Create the directory before the installer needs it**
+
+The installer writes a file, not a tree. Extend `setup:27`:
+
+```bash
+mkdir -p "$APP_DIR" "$MISE_DATA_DIR" "$MISE_DATA_DIR/bin"
+```
+
+- [ ] **Step 5: Update the rendered profile**
+
+In `zsh/template/zshrc_template`, replace the `PATH` export set in Task 5:
+
+```sh
+export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$PATH"
+```
+
+- [ ] **Step 6: Update the harness**
+
+In `test/run.sh:72`:
+
+```bash
+        PATH=\"\$APP_DIR/mise/bin:\$APP_DIR/nvim/bin:\$PATH\"
+```
+
+- [ ] **Step 7: Re-render**
+
+```bash
+mv zsh/zshrc /tmp/zshrc.before
+./setup render
+diff -u /tmp/zshrc.before zsh/zshrc
+```
+
+Expected: one changed `PATH` line.
+
+- [ ] **Step 8: Verify the orchestrator bootstraps into its new home**
+
+```bash
+./setup render
+ls -l "$APP_DIR/mise/bin/mise"
+command -v mise
+```
+
+Expected: the binary exists at the new path. `command -v mise` may still report the old one in an already-running shell; open a new shell to confirm, and note that `App/bin/mise` is left in place for the user to remove (Task 9).
+
+- [ ] **Step 9: Update GEN-R-1a**
+
+Extend the sentence added in Task 4 so the rule admits no exception:
+
+```markdown
+This includes the orchestrator itself, which owns the directory named after
+it rather than a shared binary directory. There is no bare binary directory
+under the application directory.
+```
+
+- [ ] **Step 10: Run the checks**
+
+Run: `test/run.sh bootstrap packages privileged`
+Expected: PASS. The `no bare bin directory` assertion is meaningful only in the container, which builds the application directory from empty — nothing creates `App/bin` there once this task lands. On a machine set up before this change the directory persists until the user removes it (Task 9), so expect the local filesystem and the container to disagree until then. That disagreement is the harness working as designed, not a failure.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add setup zsh/template/zshrc_template test/run.sh \
+        test/checks-bootstrap.sh docs/requirements/general.md
+git commit -m "feat: move the orchestrator binary into its own directory
+
+App/bin held mise and nvim; with nvim leaving it in the next task, keeping
+a shared binary directory for one occupant carved out an exception to the
+one-directory-per-tool rule and bought nothing. mise already owned App/mise
+for its cache and state, so its binary joins it there.
+
+The bootstrap guard now tests the new path specifically: a machine set up
+before this change still has a binary at the old one, and command -v alone
+would leave it there permanently.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: Move fetched runtime content
 
 **Files:**
 - Modify: `mise.toml` `[env]` (`CMLIB_DIR`, `CMLIB_COMPONENT_LOCAL_BASE_PATH`), `[tasks.fetch]`, `[tasks.render]`
@@ -828,7 +963,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: One installed version per tool
+### Task 8: One installed version per tool
 
 The spec records this mechanism as unresolved (F-6): `mise prune --dry-run` reported it would uninstall the stale Go version, `mise prune` then reported only "pruned configuration links" and left it in place, and `mise uninstall go@1.23.3` removed it. **Establish the behaviour before writing the task.**
 
@@ -940,7 +1075,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 8: Full regression and acceptance
+### Task 9: Full regression and acceptance
 
 **Files:**
 - Modify: `test/checks-acceptance.sh`
@@ -949,15 +1084,19 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ```bash
 assert_cmd "one directory per managed tool" bash -c '
-    for tool in go cmake cmakelib nvim ohmyzsh; do
+    for tool in go cmake cmakelib mise nvim ohmyzsh; do
         [ -d "${APP_DIR}/${tool}" ] || { echo "missing: ${tool}" >&2; exit 1; }
     done
 '
 assert_cmd "application root is not a dumping ground" bash -c '
     [ ! -e "${APP_DIR}/lib64" ] && [ ! -e "${APP_DIR}/share/nvim" ]
 '
-assert_cmd "only the orchestrator lives in bin" bash -c '
-    [ "$(ls -1 "${APP_DIR}/bin")" = "mise" ]
+assert_cmd "no bare bin directory survives" bash -c '
+    [ ! -e "${APP_DIR}/bin" ]
+'
+assert_cmd "the search path names exactly two APP_DIR entries" bash -c '
+    [ "$(printf "%s\n" $PATH | tr ":" "\n" | grep -c "^${APP_DIR}/")" -eq 2 ] &&
+    [ -d "${APP_DIR}/mise/bin" ] && [ -d "${APP_DIR}/nvim/bin" ]
 '
 ```
 
@@ -1011,15 +1150,27 @@ Stale paths from the previous layout are left in place deliberately (spec §7 �
 ```bash
 rm -rf "$HOME/App/lib64"
 rm -rf "$HOME/App/share/nvim"
-rm -rf "$HOME/App/bin/nvim"
+rm -rf "$HOME/App/bin"
 rm -rf "$HOME/App/mise/installs"
 rm -rf "$HOME/App/system-config/_vendor"
+```
+
+`App/bin` goes as a whole now rather than just its `nvim` entry: after Task 5 the orchestrator lives in `App/mise/bin`, leaving the old directory with no occupant this repository owns. Confirm that before removing it — if anything unexpected is inside, remove the two known entries by name instead:
+
+```bash
+rm -f "$HOME/App/bin/mise" "$HOME/App/bin/nvim"
+rmdir "$HOME/App/bin"
 ```
 
 Each path is named explicitly; no globs (the repository's safety rule).
 
 ---
 
-## Open item carried from the spec
+## Decisions confirmed after the spec was written
 
-**ohmyzsh's destination was assumed, not confirmed.** The spec §8 records this. If the user rules that it stays in `_vendor/`, Task 6 changes as follows: `_vendor/` and its `.gitignore` entry survive, the `___OHMYZSH_PROJECT_DIR___` placeholder keeps pointing at `${root}/_vendor`, the "vendored directory is gone" assertion is dropped, and GEN-R-3's exception gains a second member — which needs its own recorded justification, because ZSH-A-7 covers only the autosuggestions plugin.
+Both were open when the spec was drafted and were settled on 2026-08-17. Spec §8 records them.
+
+- **ohmyzsh moves to `App/ohmyzsh/`** — Task 7 as written.
+- **`App/bin/` is retired** — Task 5, added after the original eight-task draft. The orchestrator's binary moves to `App/mise/bin/mise`, which is what makes the one-directory-per-tool rule exceptionless.
+
+No open items remain.
