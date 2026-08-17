@@ -46,8 +46,9 @@ decisions.** The two items that were outstanding have been closed:
 
 - `APPS-A-5` - the orchestrator does **not** configure Flatpak remotes; an
   explicit preceding step is required (`APPS-R-7`).
-- `APPS-A-4` - desktop applications install **system-wide**, matching current
-  behaviour (`APPS-R-6`).
+- `APPS-A-4` - desktop applications now install in **user scope** (`APPS-R-10`),
+  superseding the earlier system-scope resolution that matched pre-migration
+  behaviour.
 
 ## Corrections recorded after implementation
 
@@ -68,9 +69,13 @@ kept their numbers:
 
 New identifiers were appended for behaviour that implementation added:
 `GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-R-8b`, `GEN-R-15` through
-`GEN-R-18`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through `ZSH-R-14`,
-`ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`, `APPS-R-9` and
-`APPS-A-9`.
+`GEN-R-18`, `GEN-R-19`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through
+`ZSH-R-14`, `ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`,
+`APPS-R-9`, `APPS-A-9`, `APPS-R-10` and `APPS-R-11`.
+
+`APPS-R-5` and `APPS-R-6` are withdrawn, their numbers retired: applications
+are installed in user scope by calling flatpak directly, rather than
+system-wide through the declarative table.
 
 ## Scope
 

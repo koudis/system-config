@@ -158,6 +158,8 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
 - `mise bootstrap packages apply --dry-run --manager <manager>` prints commands
   without running them, supplying the dry-run this repo has never had.
 - sudo elevation is explicit and logged. It never hangs waiting for a password.
+  This applies to the privileged phase only (GEN-R-19); the unprivileged phase
+  invokes no elevation.
 - `[bootstrap.user]` with key `login_shell` adds the shell to `/etc/shells` and
   applies `chsh -s`. **This removes the manual `chsh` step** that
   `zsh/README.md` documents today. The value must be an absolute path
@@ -165,9 +167,11 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
   `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
   authenticates the target user through PAM - which blocks on a password prompt
   for a non-root caller - and sudo's `secure_path` drops `$APP_DIR/bin`, where
-  mise itself lives.
-- Both managers' entries share one `[bootstrap.packages]` table, since TOML
-  forbids a duplicate header; they are separated at apply time by `--manager`.
+  mise itself lives. This apply runs in the privileged phase (GEN-R-19).
+- The `[bootstrap.packages]` table holds `dnf:` entries only. The seventeen
+  Flatpak applications are installed by calling `flatpak` directly from a task
+  body, in user scope, rather than through a `flatpak` manager entry in this
+  table (APPS-R-10, APPS-R-11).
 
 **The naming this section originally recorded was wrong.** An earlier draft
 described the table as a `packages` table under a `system` table, applied by an
@@ -488,8 +492,9 @@ machines, and it would not work anyway: when the Flatpak CLI is absent mise
 nothing instead of advancing. Tier 3 is per-application, not a blanket promise -
 GitKraken is proprietary and has no buildable source (APPS-R-3).
 
-**Scope is system-wide** (APPS-R-6), matching current behaviour, so no silent
-migration of 17 applications between scopes.
+**Scope is user** (APPS-R-10), a deliberate migration of 17 applications away
+from the pre-migration system-wide scope, accepted because it removes
+elevation from the default path.
 
 **The remote is this repo's responsibility.** mise does not install Flatpak or
 configure remotes implicitly, so an explicit preceding step must ensure the CLI
@@ -607,7 +612,8 @@ regression guard rather than a live safeguard, and it is retained as such.
   `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
   authenticates through PAM and sudo's `secure_path` drops `$APP_DIR/bin`. The
   apply is unconditional, so it asks for elevation on every run even when the
-  shell is already set. See ZSH-A-8 and ZSH-A-9.
+  shell is already set. This per-run elevation applies to `./setup system`
+  only, not to the default `./setup`. See ZSH-A-8 and ZSH-A-9.
 
 Resolved during validation, in order of discovery: ohmyzsh tarball breakage
 (now specified as a git clone, 6.2); Neovim tarball version stamping (safe at

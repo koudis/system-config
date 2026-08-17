@@ -122,8 +122,11 @@ uploaded a key to any forge. Every source URL SHALL therefore be reachable
 anonymously over HTTPS. `VERIFIED` - this is the failure mode of the current
 repository, where four sources use SSH URLs.
 
-**GEN-A-5 `sudo` is available and interactive.** System package installation
-requires elevation and the user is present to authorise it. `VERIFIED`.
+**GEN-A-5 `sudo` is available and interactive during the privileged phase.**
+System package installation requires elevation and the user is present to
+authorise it. This holds for the privileged phase only; the unprivileged phase
+requires no elevation and is verified where `sudo` is not installed (GEN-R-19).
+`VERIFIED`.
 
 **GEN-A-6 The orchestrator's configuration is found from the repository root.**
 Configuration resolution walks upward from the working directory, so a
@@ -345,6 +348,13 @@ content SHALL be a pure function of the pins it represents, so that an
 unchanged pin reproduces byte-identical content and the gate still reports the
 build as fresh.
 
+### Elevation
+
+**GEN-R-19** Setup SHALL be split into a privileged phase and an unprivileged
+phase. The unprivileged phase SHALL invoke no elevation, and SHALL verify its
+system prerequisites before running any task that needs them, failing and
+naming every absent prerequisite when any is missing.
+
 ---
 
 ## 5. Verification of the global requirements
@@ -371,6 +381,7 @@ build as fresh.
 | GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
 | GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |
+| GEN-R-19 | The unprivileged phase completes in an image where sudo is not installed |
 
 ---
 

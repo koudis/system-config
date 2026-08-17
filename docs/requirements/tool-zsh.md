@@ -122,6 +122,9 @@ for elevation every run even when nothing changes. This is a known cost, not a
 defect in the requirement: the apply itself is a no-op the second time.
 `VERIFIED` - observed in two consecutive harness runs.
 
+The elevation is confined to the privileged phase (GEN-R-19), so this cost
+applies to `./setup system` only and not to the default `./setup`.
+
 ## 8. Rendered configuration
 
 **ZSH-R-7** One file is rendered and deployed: the shell configuration itself.

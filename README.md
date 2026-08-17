@@ -21,17 +21,22 @@ One requirements document per entry lives in `docs/requirements/`.
 
 ```bash
 sudo -v
+./setup system
 ./setup
 ```
 
-That is the whole procedure. `./setup` installs [mise] if it is missing and
-then runs every task declared in `mise.toml`. Running it a second time changes
-nothing.
+`./setup` installs [mise] if it is missing and then runs every task declared in
+`mise.toml`. Running either command a second time changes nothing.
 
-Refresh the sudo credential first, as shown. Package installation and the login
-shell change run as tasks, and mise interleaves task output, so a password
-prompt appearing from inside a task is unprefixed and easy to miss among the
-other lines.
+`./setup system` is the privileged half and is run once per machine. It installs
+the distribution packages and sets the login shell, and it is the only command
+here that elevates. `./setup` is the whole rest of the work and never elevates -
+it refuses to start if the privileged half has not run, naming what is missing.
+
+Refresh the sudo credential first, as shown, before `./setup system`. Package
+installation and the login shell change run as tasks, and mise interleaves task
+output, so a password prompt appearing from inside a task is unprefixed and easy
+to miss among the other lines.
 
 Everything is installed under `$APP_DIR`, which defaults to `~/App`. Export a
 different `APP_DIR` before running to install somewhere else.

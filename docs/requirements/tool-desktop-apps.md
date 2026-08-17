@@ -20,7 +20,10 @@ desktop software.
 
 **APPS-A-1** This is also forced, not merely chosen: the orchestrator's Flatpak
 manager rejects version pins outright and accepts only "latest". `VERIFIED` -
-orchestrator Flatpak documentation and the change that added the manager.
+orchestrator Flatpak documentation and the change that added the manager. This
+no longer describes the mechanism in use - applications are installed by
+calling flatpak directly. APPS-R-1 is unaffected: flatpak exposes no
+historical-version install either.
 
 ## 3. Acquisition preference order
 
@@ -48,7 +51,8 @@ the Flatpak CLI is absent the orchestrator lists those entries as *skipped*
 rather than erroring, so a "if Flatpak is unavailable, fall through" rule would
 silently install nothing rather than advancing to the next tier. `VERIFIED` -
 orchestrator package documentation: entries for an unavailable manager are not
-acted on.
+acted on. This failure mode no longer exists here: preflight blocks on an
+absent flatpak before the step runs. APPS-R-2 stands on its remaining grounds.
 
 **APPS-R-3** Tier 3 SHALL be authored per application and SHALL NOT be assumed
 available for all. Several of the seventeen have no buildable source at all -
@@ -75,16 +79,20 @@ All seventeen are currently tier 1 (Flatpak).
 | System | Flatseal, GNOME Extensions, Extension Manager | 1 |
 | Other | Bottles, Tellico | 1 |
 
-**APPS-R-5** The list SHALL live in the single declarative location alongside
-the distribution packages, not in a separate imperative step with its own
-wrapper. In practice that is the same `[bootstrap.packages]` table as the
-distribution packages, because a duplicate table header is not permitted
-(GEN-A-8a); the two are separated when applied, by naming the manager, not by
-being declared apart.
+**WITHDRAWN.** **APPS-R-5** The list SHALL live in the single declarative
+location alongside the distribution packages, not in a separate imperative
+step with its own wrapper. In practice that is the same `[bootstrap.packages]`
+table as the distribution packages, because a duplicate table header is not
+permitted (GEN-A-8a); the two are separated when applied, by naming the
+manager, not by being declared apart. Withdrawn because the applications are
+installed by calling flatpak directly rather than through the declarative
+table; replaced by APPS-R-11.
 
 ## 5. Installation scope
 
-**APPS-R-6** Applications SHALL be installed **system-wide**, not per-user.
+**WITHDRAWN.** **APPS-R-6** Applications SHALL be installed **system-wide**,
+not per-user. Withdrawn in favour of APPS-R-10: system scope is what required
+elevation.
 
 **APPS-A-3** The orchestrator exposes these as two distinct managers - one for
 system scope, one for user scope - so the choice is expressed by which manager
@@ -95,7 +103,8 @@ manager list.
 installs without a user-scope flag, which is system scope by default.
 `VERIFIED` - read from the current setup step. Choosing system scope therefore
 changes nothing about the resulting machine and avoids a silent migration of
-seventeen applications between scopes.
+seventeen applications between scopes. Superseded, not incorrect: removing
+elevation from the default path now outranks matching the pre-migration scope.
 
 ## 6. The remote
 
@@ -130,10 +139,16 @@ added one. On a fresh machine without Third-Party Repositories enabled, all
 seventeen fail. `VERIFIED` - read from the current setup step.
 
 **APPS-R-9** The applications SHALL be applied in a step of their own that
-follows the remote step, by applying only the Flatpak entries of the shared
-table. The distribution packages are applied earlier by naming the other
-manager. Two steps are required by the ordering constraint in APPS-R-7 and are
-possible only because the manager can be named at apply time (GEN-A-8a).
+follows the remote step, by calling flatpak directly for each identifier. The
+distribution packages are applied separately, in the privileged phase. Two
+steps are required by the ordering constraint in APPS-R-7.
+
+**APPS-R-10** Applications SHALL be installed in user scope, so that installing
+them requires no elevation (GEN-R-19).
+
+**APPS-R-11** The application identifiers SHALL live in `mise.toml` and nowhere
+else, so that GEN-R-7 continues to hold now that they are not declared in
+`[bootstrap.packages]`.
 
 ## 6a. What is not verified
 
@@ -142,7 +157,7 @@ verification harness proves that the remote exists, that it is unfiltered, and
 that every one of the seventeen identifiers resolves against it - not that the
 applications install. A resolvable identifier can still fail to install for
 reasons no check covers: disk space, architecture mismatch, or a runtime
-conflict. A genuine system-scope Flatpak install needs a working system bus
+conflict. A genuine user-scope Flatpak install needs a working system bus
 that the sandboxed container does not have, so nothing cheap closes this gap.
 `VERIFIED` - both halves were observed: the harness never runs the application
 target, and the sandboxed container provides no system bus. The first real
@@ -167,9 +182,10 @@ everything else (GEN-R-5).
 | Requirement | Check |
 |---|---|
 | APPS-R-2 | Every application in section 4 has a recorded tier |
-| APPS-R-6 | Installed scope is system-wide for all seventeen |
 | APPS-R-7 | On a machine with Third-Party Repositories disabled and no remote configured, setup still installs all seventeen |
 | APPS-R-8 | Setup runs twice in succession without error |
 | APPS-R-4 | No application is installed from two sources simultaneously |
-| APPS-R-9 | The application step declares the remote step as its predecessor, and applying it names the Flatpak manager only |
-| APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all seventeen are confirmed installed and system-scoped |
+| APPS-R-9 | The application step declares the remote step as its predecessor |
+| APPS-R-10 | Installed scope is user for all seventeen, and no system remote is added |
+| APPS-R-11 | The seventeen identifiers appear in mise.toml and in no other tracked file |
+| APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all seventeen are confirmed installed and user-scoped |
