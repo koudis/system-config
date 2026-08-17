@@ -194,7 +194,7 @@ instead of six files. The task DAG below is unchanged either way.
 all
  +-- packages   dnf packages + build prerequisites + login_shell
  +-- flathub    ensure flatpak CLI + unfiltered Flathub remote  (depends: packages)
- +-- apps       17 applications, system scope                   (depends: flathub)
+ +-- apps       17 applications, user scope                     (depends: flathub)
  +-- go         [tools] pin                                     (depends: packages)
  +-- cmake      [tools] pin, or source build                    (depends: packages)
  +-- fetch      clone/download + verify vendored sources
@@ -424,7 +424,7 @@ of glibc in Fedora 35+, and without it the build fails on charset errors.
 Desktop applications (17): KiCad, FreeCAD, Anki, Obsidian, PrusaSlicer, drawio,
 Bottles, TeXstudio, OnlyOffice, JOSM, GitKraken, Krita, Flatseal, GNOME
 Extensions, Extension Manager, Arduino IDE2, Tellico. All tier 1 (Flatpak),
-installed **system-wide** - see 7.2.
+installed in **user scope** - see 7.2.
 
 Template placeholders. Two are ported, one is **added**, three are **deleted**:
 
@@ -572,7 +572,7 @@ regression guard rather than a live safeguard, and it is retained as such.
 10. No absolute path containing a hardcoded username appears anywhere in the
     repo (`grep -rn '/home/[a-z]' --include='*_template'` returns nothing).
 11. All 17 applications install on a box with Third-Party Repositories disabled
-    and no Flathub remote configured, and all report system scope.
+    and no Flathub remote configured, and all report user scope.
 12. Every declared package name resolves in Fedora's repositories - in
     particular `the_silver_searcher` and `python3-neovim`, not `ag` and
     `python-neovim`.
@@ -603,9 +603,12 @@ regression guard rather than a live safeguard, and it is retained as such.
   17 application IDs; it never installs them. A resolvable ID can still fail to
   install for reasons no check covers - disk space, architecture, runtime
   conflicts - and the first real signal comes from the user's own machine. A
-  real `flatpak install --system` needs a working system bus the sandboxed
-  container does not have, so nothing cheap closes this. Bounded by the fact
-  that the same apply mechanism is proven with `--manager dnf`. See APPS-A-9.
+  real `flatpak install --user` needs a working system bus the sandboxed
+  container does not have, so nothing cheap closes this. Every identifier is
+  proven to resolve, which bounds resolution risk; it does not bound whether
+  the install itself succeeds, since the applications are now installed by a
+  direct `flatpak install --user` call that shares no apply path with the dnf
+  packages proven elsewhere. See APPS-A-9.
 - **RR6 (low): the login-shell change needs an absolute path and elevation with
   `PATH` forwarded.** `login_shell` must be `/usr/bin/zsh`; mise rejects the
   bare name. Applying it requires

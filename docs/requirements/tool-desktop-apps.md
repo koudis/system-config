@@ -162,9 +162,11 @@ that the sandboxed container does not have, so nothing cheap closes this gap.
 `VERIFIED` - both halves were observed: the harness never runs the application
 target, and the sandboxed container provides no system bus. The first real
 signal therefore comes from the user's own machine, and this is an
-accepted risk rather than a covered case. The same apply mechanism is proven
-against the distribution-package manager, and every identifier is proven to
-resolve, which is what bounds the risk.
+accepted risk rather than a covered case. Every identifier is proven to
+resolve, which bounds the risk of a wrong or unreachable identifier. It does
+not bound whether the install itself succeeds: the mechanism is a direct
+`flatpak install --user` call that shares no apply path with the dnf packages
+proven elsewhere, so nothing closes this gap short of the first real run.
 
 ## 7. Declared inputs
 
