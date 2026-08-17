@@ -62,4 +62,43 @@ An unchanged generated file is left untouched, so a repeat run stays a no-op.
 
 To add a tool, follow [docs/adding-a-new-tool.md](docs/adding-a-new-tool.md).
 
+## Migrating from a pre-split checkout
+
+A checkout from before `./setup` was split into `./setup system` and `./setup`
+needs three one-time steps on its first run under the new layout.
+
+**1. The seventeen Flatpaks.** They used to install system-wide; they now
+install in user scope (`APPS-R-10`), and the first `./setup` adds a second,
+user-scope copy of each rather than adopting the system one. The old
+system-scope copies become dead weight once the user-scope copies land.
+Remove them with the exact identifiers below - not a glob, and not
+`--unused`, because the system installation may hold other applications this
+repository does not manage:
+
+```bash
+sudo flatpak uninstall --system \
+  org.kicad.KiCad org.freecad.FreeCAD net.ankiweb.Anki md.obsidian.Obsidian \
+  com.prusa3d.PrusaSlicer com.jgraph.drawio.desktop com.usebottles.bottles \
+  org.texstudio.TeXstudio org.onlyoffice.desktopeditors org.openstreetmap.josm \
+  com.axosoft.GitKraken org.kde.krita com.github.tchx84.Flatseal \
+  org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2 \
+  org.kde.tellico
+```
+
+These identifiers are declared once, in `mise.toml`'s `FLATPAK_APPS` - re-read
+them from there rather than trusting this copy if the two ever disagree.
+
+**2. `zsh/zshrc`.** It is gitignored, so a copy generated before the
+`vendor/` to `_vendor/` rename still names the old path, and `[tasks.render]`'s
+overwrite guard refuses by name on the first run afterwards. Delete the
+generated `zsh/zshrc` before re-running `./setup`; it will be regenerated from
+the template.
+
+**3. An orphaned `vendor/` tree.** The same rename dropped `vendor/` from
+`.gitignore` in favour of `_vendor/`, so a populated `vendor/` left over from
+before the rename now shows up as untracked content under `git status`. This
+is expected; leave it where it is. Do not add it back to `.gitignore` (that
+would only hide it) and do not delete it automatically - remove it yourself
+once you have confirmed you no longer need it.
+
 [mise]: https://mise.jdx.dev

@@ -381,7 +381,7 @@ naming every absent prerequisite when any is missing.
 | GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
 | GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |
-| GEN-R-19 | The unprivileged phase completes in an image where sudo is not installed |
+| GEN-R-19 | Each unprivileged task (preflight, tools, fetch, render, link, flathub, preview) completes in an image where sudo is not installed; proven piecewise, not as one `all` run, because `all` is the ~15 GB application-download path |
 
 ---
 

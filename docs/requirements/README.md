@@ -42,7 +42,7 @@ source named. An assumption with no status is a guess and SHALL NOT be relied
 upon.
 
 **Every assumption in the set is now `VERIFIED` and there are no open
-decisions.** The two items that were outstanding have been closed:
+decisions.** The two items that were outstanding are now resolved:
 
 - `APPS-A-5` - the orchestrator does **not** configure Flatpak remotes; an
   explicit preceding step is required (`APPS-R-7`).

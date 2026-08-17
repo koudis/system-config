@@ -63,7 +63,13 @@ GEN-R-13 and is no longer covered by this one.
 
 **APPS-R-4** Where an application moves between tiers, the change SHALL be
 recorded in section 4 and the previous installation SHALL be removed, so that
-two copies from different sources never coexist.
+two copies from different sources never coexist. Amended: a scope move (section
+5) creates the identical hazard a tier move does - the seventeen's move from
+system to user scope leaves the pre-existing system-scope copies in place on
+any machine that already had them, so this requirement holds only after the
+one-time manual cleanup in `README.md`'s "Migrating from a pre-split checkout"
+is carried out. It does not hold automatically from a bare `./setup` run on
+such a machine.
 
 ## 4. The inventory
 
@@ -105,6 +111,14 @@ installs without a user-scope flag, which is system scope by default.
 changes nothing about the resulting machine and avoids a silent migration of
 seventeen applications between scopes. Superseded, not incorrect: removing
 elevation from the default path now outranks matching the pre-migration scope.
+
+Moving from system to user scope is itself a migration, on any machine where
+the applications were already installed system-wide before this change
+landed: the first `./setup` there adds a user-scope copy of each without
+removing the pre-existing system-scope one, so both exist at once until the
+system-scope copies are removed by hand. `README.md`'s "Migrating from a
+pre-split checkout" section names the exact `flatpak uninstall --system`
+command for this one-time cleanup. See also the APPS-R-4 amendment above.
 
 ## 6. The remote
 
@@ -189,6 +203,6 @@ everything else (GEN-R-5).
 | APPS-R-8 | Setup runs twice in succession without error |
 | APPS-R-4 | No application is installed from two sources simultaneously |
 | APPS-R-9 | The application step declares the remote step as its predecessor |
-| APPS-R-10 | Installed scope is user for all seventeen, and no system remote is added |
+| APPS-R-10 | Installed scope is user for all seventeen, and no system remote is added by this repository |
 | APPS-R-11 | The seventeen identifiers appear in mise.toml and in no other tracked file |
 | APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all seventeen are confirmed installed and user-scoped |

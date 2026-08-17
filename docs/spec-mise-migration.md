@@ -251,7 +251,7 @@ command exists is not an operating-system conditional and is not what GEN-R-8
 prohibits: GEN-R-8 targets branching on the platform, which is dead code in a
 Fedora-only repository, whereas this branches on whether setup has run yet -
 the normal state of the fresh notebook this repository exists to configure. The
-same idiom is used at `setup:14` and `test/run.sh:29`. See GEN-R-8b.
+same idiom is used at `setup:43` and `test/run.sh:73`. See GEN-R-8b.
 
 ### 5.5 Freshness strategy for build tasks
 
@@ -555,10 +555,11 @@ regression guard rather than a live safeguard, and it is retained as such.
 
 ## 10. Acceptance criteria
 
-1. `git clone <https-url> && cd && ./setup` succeeds on a fresh Fedora box with
-   no SSH key configured.
-2. A second `./setup` immediately afterwards is a no-op for every task and
-   exits non-zero nowhere.
+1. `git clone <https-url> && cd && sudo -v && ./setup system && ./setup`
+   succeeds on a fresh Fedora box with no SSH key configured.
+2. A second run of each phase immediately afterwards is a no-op for every task
+   and exits non-zero nowhere: `./setup system` a second time, and separately
+   `./setup` a second time.
 3. `git submodule status` reports nothing.
 4. No file outside the repository and the application directory except the
    three symlinks and their parent dirs.
@@ -576,8 +577,14 @@ regression guard rather than a live safeguard, and it is retained as such.
 12. Every declared package name resolves in Fedora's repositories - in
     particular `the_silver_searcher` and `python3-neovim`, not `ag` and
     `python-neovim`.
-13. The Neovim build succeeds on a Fedora box with no development tooling
-    pre-installed, proving the prerequisite list is complete.
+13. The Neovim build succeeds on a Fedora box carrying only
+    `test/Containerfile.nosudo`'s hand-written prerequisite list, proving that
+    list is complete. This no longer proves `[bootstrap.packages]`'s dnf list
+    is complete: `[tasks.nvim]` now depends on `preflight`, not `packages`, so
+    the build never touches the privileged phase's dnf install. Three lists -
+    `[bootstrap.packages]`'s dnf entries, preflight's seven commands, and
+    `Containerfile.nosudo`'s dnf line - must still agree by hand; nothing
+    compares them (see design spec section 6.1).
 14. No operating-system conditional exists anywhere in the repository
     (GEN-R-8).
 15. Every managed tool has a requirements document (GEN-R-13); the identifier

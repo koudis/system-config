@@ -259,6 +259,18 @@ separate question of whether the privileged phase installs the right things,
 which the first image already covers. If any elevation remains in the
 unprivileged phase, `sudo` is genuinely absent from the image and the run fails.
 
+This isolation has a cost, not eliminated by it: before this split,
+`[tasks.nvim]` depended on `packages` and ran on the privileged image, so a
+green Neovim build was transitive proof that `[bootstrap.packages]`'s dnf list
+was complete. Now `[tasks.nvim]` depends on `preflight` and runs on
+`Containerfile.nosudo`, whose prerequisites are a hand-written dnf line at
+`test/Containerfile.nosudo:8` - a separate list from `[bootstrap.packages]` and
+from preflight's seven-command check. Three lists must now agree by hand -
+`[bootstrap.packages]`'s dnf entries, preflight's command list, and
+`Containerfile.nosudo`'s dnf line - and nothing compares them. They agree today
+on the build-relevant subset; keeping them agreeing is a manual discipline this
+design does not automate.
+
 ### 6.2 Runner signature
 
 ```
@@ -443,8 +455,11 @@ now. What remains are three bounded risks.
 **Idempotence of the application step.** `flatpak install --or-update` is
 asserted to be a silent no-op on an already-installed application, which is what
 `GEN-R-4` requires of a second run. This is the one behaviour in the design that
-the harness must actually demonstrate rather than infer, and `test/run.sh`
-already runs every target twice, so the existing structure proves it.
+the harness would need to actually demonstrate rather than infer - but section
+6.3's check assignment maps the `apps` check set to target `flathub`, not
+`apps`, so `[tasks.apps]`'s body never runs in the harness at all, twice or
+otherwise. `--or-update` idempotence is unexercised by the harness and is
+closed only by the first run on a real machine, alongside `APPS-A-9` below.
 
 If `--or-update` turns out not to be sufficient, the fallback is to test
 membership first and skip:
@@ -484,9 +499,11 @@ sudo-free, and only the desktop applications would require `./setup system`.
 5. Both `mise run preview` and `mise run preview-system` succeed, `preview` in
    the sudo-less image.
 6. Every check set passes on a second consecutive run, unchanged (idempotence,
-   `GEN-R-4`). For `apps` this is the specific proof that
-   `flatpak install --or-update` is a no-op on an already-installed
-   application.
+   `GEN-R-4`). For `apps` the check set's target is `flathub` (section 6.3),
+   not `apps`, so `[tasks.apps]`'s body never executes in the harness and this
+   criterion does NOT prove `flatpak install --or-update` idempotence for the
+   applications - see `APPS-A-9` and section 9, "Idempotence of the application
+   step".
 7. `git grep` finds no surviving citation of the withdrawn `APPS-R-5` or
    `APPS-R-6` outside the withdrawal notices themselves and the dated plan
    record.
