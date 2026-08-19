@@ -9,3 +9,9 @@ assert_path_under "go under APP_DIR"      go    "$APP"
 # is what it meant to assert, and the two assert_path_under lines above assert
 # exactly that, against the resolved binaries rather than against a directory
 # name nobody writes to.
+assert_cmd "go installs directly under APP_DIR" bash -c '
+    [ -d "${APP_DIR}/go" ] && [ ! -d "${APP_DIR}/mise/installs/go" ]
+'
+assert_cmd "cmake installs directly under APP_DIR" bash -c '
+    [ -d "${APP_DIR}/cmake" ] && [ ! -d "${APP_DIR}/mise/installs/cmake" ]
+'
