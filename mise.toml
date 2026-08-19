@@ -39,6 +39,19 @@ org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2
 org.kde.tellico
 """
 
+# The orchestrator's own binary, named here rather than left to bare `mise`
+# lookups in task bodies (GEN-A-13): mise strips every inherited PATH entry
+# under the installs directory before handing a task its shell, and that
+# directory is now the application root, so wherever the orchestrator itself
+# is installed falls inside what gets stripped. Deliberately not
+# MISE_-prefixed, so it cannot collide with a future upstream setting. This is
+# an ordinary derived value consumed only by task bodies, not one mise reads
+# at process start (GEN-A-7), so [env] is where it belongs - it is not the
+# process-start prohibition GEN-R-16 covers. Its value names the binary's
+# current home; a later task moves the binary to App/mise/bin/mise and
+# repoints this one line.
+ORCHESTRATOR_BIN = "{{env.APP_DIR}}/bin/mise"
+
 [tools]
 cmake = "3.30.1"
 go    = "1.26.6"
@@ -70,12 +83,25 @@ login_shell = "/usr/bin/zsh"
 # --manager dnf is not required for correctness now that this table holds
 # only dnf: entries (the flatpak: entries moved to FLATPAK_APPS and
 # [tasks.apps]). It stays because it states the scope at the call site.
+# Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13): task bodies
+# lose any inherited PATH entry under the installs directory, which now
+# includes wherever the orchestrator itself is installed.
 [tasks.packages]
-run = "mise bootstrap packages apply --yes --manager dnf"
+run = '"$ORCHESTRATOR_BIN" bootstrap packages apply --yes --manager dnf'
 
 # chsh authenticates the target user via PAM, which blocks on a password
-# prompt for a non-root caller; running it via sudo skips that prompt. sudo's
-# secure_path drops $APP_DIR/bin, so PATH must be forwarded explicitly.
+# prompt for a non-root caller; running it via sudo skips that prompt. sudo
+# clears the environment by default, forwarding neither variable on its own.
+# Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13); expanded in
+# this shell before sudo runs, so locating the orchestrator itself no longer
+# needs PATH forwarded - but the elevated process is a fresh `mise` that
+# re-parses this file from scratch, and ORCHESTRATOR_BIN's own template
+# (`{{env.APP_DIR}}`) fails to resolve unless APP_DIR is forwarded too:
+# without it mise errors "Field `APP_DIR` is not defined" before the task
+# body ever runs. PATH stays forwarded as well - secure_path would otherwise
+# drop $APP_DIR/bin from what `mise bootstrap user apply` sees while running,
+# and nothing here proves that step never shells out to a bare tool name that
+# needs it.
 # This is the only literal sudo in this file (GEN-R-19); mise elevates on its
 # own for the dnf apply above.
 # depends = ["packages"]: mise runs independent dependencies of [tasks.system]
@@ -83,7 +109,7 @@ run = "mise bootstrap packages apply --yes --manager dnf"
 # dnf apply in packages has installed it. Without this, the two tasks race.
 [tasks.login-shell]
 depends = ["packages"]
-run = 'sudo env "PATH=$PATH" mise bootstrap user apply --yes'
+run = 'sudo env "PATH=$PATH" "APP_DIR=$APP_DIR" "$ORCHESTRATOR_BIN" bootstrap user apply --yes'
 
 # The privileged phase. Everything reachable from here may elevate; nothing
 # outside it may (GEN-R-19).
@@ -153,10 +179,13 @@ fi
 # fresh box downloads both SDKs on the way to fetching. Removing the task would
 # leave no way to ask for the SDK step alone, which is what [tasks.all] and the
 # harness (`test/run.sh tools tools unprivileged`) name, so it stays as that
-# entry point.
+# entry point. Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13):
+# the installs directory is now the application root, and mise strips any
+# inherited PATH entry beneath it - including wherever the orchestrator's own
+# binary lives - before handing this task its shell.
 [tasks.tools]
 depends = ["preflight"]
-run = "mise install"
+run = '"$ORCHESTRATOR_BIN" install'
 
 [tasks.fetch]
 run = """
@@ -383,18 +412,23 @@ run = "echo setup complete"
 # The application half is hand-rolled because driving flatpak directly costs
 # the --dry-run the declarative table would have provided; it reads the same
 # FLATPAK_APPS list the install step reads.
+# The nested `mise run --dry-run all` is invoked through ORCHESTRATOR_BIN, not
+# bare `mise` (GEN-A-13): it runs inside this task's own shell, which has
+# already lost any inherited PATH entry under the installs directory.
 [tasks.preview]
 run = """
 set -euo pipefail
-mise run --dry-run all
+"$ORCHESTRATOR_BIN" run --dry-run all
 installed=$(flatpak list --user --columns=application 2>/dev/null || true)
 for app in $FLATPAK_APPS; do
     grep -Fqx "$app" <<<"$installed" || echo "would install: $app"
 done
 """
 
+# Both nested invocations go through ORCHESTRATOR_BIN for the same reason
+# (GEN-A-13).
 [tasks.preview-system]
 run = """
-mise run --dry-run system
-mise bootstrap packages apply --dry-run --manager dnf
+"$ORCHESTRATOR_BIN" run --dry-run system
+"$ORCHESTRATOR_BIN" bootstrap packages apply --dry-run --manager dnf
 """

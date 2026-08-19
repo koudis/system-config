@@ -212,6 +212,25 @@ orchestrator compares against never reflects a pin change ahead of that
 decision. `VERIFIED` - observed while implementing the Neovim build; a version
 bump did not trigger a rebuild until the write was moved out.
 
+**GEN-A-13 A task body reaches the orchestrator only by absolute path.** When
+mise builds the environment for a task's own shell, it strips every inherited
+`PATH` entry that falls under the installs directory before injecting the
+resolved bin directories of the currently pinned tools; the injected tool
+paths still resolve inside a task body, but nothing else inherited from that
+directory survives, including wherever the orchestrator's own binary happens
+to be installed if that location is beneath the installs directory. A task
+body that shells out to the bare command name therefore fails with "command
+not found" once the installs directory is the application root (GEN-R-1a).
+`VERIFIED - observed against mise 2026.8.6`: `mise exec -- sh -c 'echo $PATH'`
+run with the installs directory set to the application root omits an
+inherited entry naming the orchestrator's own install directory while still
+containing the resolved cmake and go bin directories; the same omission
+reproduced inside a real task body (`mise install`, run bare from within a
+task, failed with "mise: command not found") and independently inside the
+unprivileged container. Task bodies therefore invoke the orchestrator through
+an absolute path recorded once in `[env]` (`ORCHESTRATOR_BIN`), not by the
+bare command name.
+
 ---
 
 ## 4. Global requirements
@@ -232,6 +251,11 @@ and the parent directories those links require.
 application directory (GEN-D-13). No installed artifact SHALL be written to any
 other location outside the repository. In particular there SHALL NOT be a
 second install prefix such as a separate user binary directory.
+
+Installed artifacts SHALL be grouped one directory per tool, named after the
+tool, directly beneath the application directory. The prohibition on a second
+install prefix is unchanged: there remains exactly one prefix, and the
+per-tool directories are its contents, not rival prefixes.
 
 **GEN-R-1b** The application directory SHALL be configurable through a single
 declared setting, SHALL default to `~/App`, and SHALL be referenced everywhere
@@ -347,12 +371,14 @@ environment (GEN-A-7) is prepared. This is what allows verification to exercise
 one task at a time: the aggregate task pulls in the desktop applications, which
 are roughly 15 GB of downloads that no check needs.
 
-**GEN-R-16** The tool-install location variable SHALL be exported by exactly
-two places: the entry point, for the setup run itself, and the rendered
-login-shell profile, for every later interactive session (GEN-A-11). It SHALL
-NOT be set from the orchestrator's own configuration, which is read too late
-(GEN-A-7). Both exporters SHALL derive it from the application-directory
-setting rather than repeating a literal path (GEN-R-1b).
+**GEN-R-16** The application-directory setting, the orchestrator's data
+directory, and the orchestrator's installs directory SHALL each be exported by
+exactly two places: the entry point, for the setup run itself, and the
+rendered login-shell profile, for every later interactive session (GEN-A-11).
+The data directory and the installs directory SHALL NOT be set from the
+orchestrator's own configuration, which is read too late (GEN-A-7). Both
+exporters SHALL derive the data directory and the installs directory from the
+application-directory setting rather than repeating a literal path (GEN-R-1b).
 
 ### Destructive operations
 
@@ -413,7 +439,8 @@ naming every absent prerequisite when any is missing.
 | GEN-R-10 | Preview mode runs and changes nothing |
 | GEN-R-13 | Every managed tool has a matching document in this directory |
 | GEN-R-15 | The entry point given a task name runs that task and its declared predecessors only; given no argument it runs `all` |
-| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory under the application directory; the orchestrator's configuration contains no assignment of that variable |
+| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory and its installs directory both under the application directory; the orchestrator's configuration contains no assignment of either variable |
+| GEN-A-13 | Every task body that invokes the orchestrator does so through `"$ORCHESTRATOR_BIN"`, never through a bare `mise`; searching the task table for a bare invocation returns nothing |
 | GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
 | GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |

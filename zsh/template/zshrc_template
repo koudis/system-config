@@ -138,13 +138,14 @@ setopt EXTENDED_HISTORY
 setopt hist_ignore_all_dups
 
 # Tool visibility comes from mise activation, which covers every installed
-# artifact at once. mise reads MISE_DATA_DIR at process start, so it cannot be
-# supplied by mise.toml's [env]: an interactive shell that fails to export it
-# here installs outside the application directory. ./setup exports the same
-# pair for its own process; a login shell is the second place that legitimately
-# needs them.
+# artifact at once. mise reads MISE_DATA_DIR and MISE_INSTALLS_DIR at process
+# start, so neither can be supplied by mise.toml's [env]: an interactive shell
+# that fails to export them here installs outside the application directory.
+# ./setup exports the same set for its own process; a login shell is the
+# second place that legitimately needs them.
 export APP_DIR="${APP_DIR:-$HOME/App}"
 export MISE_DATA_DIR="$APP_DIR/mise"
+export MISE_INSTALLS_DIR="$APP_DIR"
 export PATH="$APP_DIR/bin:$PATH"
 # Activation resolves tools by walking up from $PWD, so on its own it exposes
 # them only beneath this repository - narrower than the unconditional path

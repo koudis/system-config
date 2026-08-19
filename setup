@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# APP_DIR and MISE_DATA_DIR are read by mise at process start and cannot be
-# set from mise.toml's [env] (GEN-A-7). This wrapper exists to export them.
+# APP_DIR, MISE_DATA_DIR and MISE_INSTALLS_DIR are read by mise at process
+# start and cannot be set from mise.toml's [env] (GEN-A-7). Setting the
+# installs directory there would let an install use one directory while later
+# lookups use another. This wrapper exists to export them.
 export APP_DIR="${APP_DIR:-$HOME/App}"
 export MISE_DATA_DIR="$APP_DIR/mise"
+export MISE_INSTALLS_DIR="$APP_DIR"
 
 root="$(git rev-parse --show-toplevel)"
 

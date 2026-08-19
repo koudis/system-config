@@ -64,13 +64,22 @@ podman run --rm -i \
             ./setup ${TARGET}
         fi
         export APP_DIR=\"\${APP_DIR:-\$HOME/App}\"
-        # Mirrors ./setup's own MISE_DATA_DIR export (GEN-A-7): ./setup ran as a
-        # child process above, so that export never reached this parent shell.
-        # This re-derives the same value rather than redefining it, and never
-        # runs outside throwaway container verification.
+        # Mirrors ./setup's own MISE_DATA_DIR and MISE_INSTALLS_DIR exports
+        # (GEN-A-7): ./setup ran as a child process above, so those exports
+        # never reached this parent shell. This re-derives the same values
+        # rather than redefining them, and never runs outside throwaway
+        # container verification.
         export MISE_DATA_DIR=\"\$APP_DIR/mise\"
+        export MISE_INSTALLS_DIR=\"\$APP_DIR\"
         PATH=\"\$APP_DIR/bin:\$PATH\"
         command -v mise >/dev/null && eval \"\$(mise env -s bash)\"
+        # mise env -s bash recomputes PATH the same way it does for any task
+        # body (GEN-A-13): it strips every inherited entry under the installs
+        # directory, which now includes \$APP_DIR/bin itself, so mise
+        # disappears from PATH the moment the eval above runs. Re-assert it
+        # rather than skip the eval, which is still needed to pick up [env]
+        # (FLATPAK_APPS, CMLIB_DIR, ...) for the checks below.
+        PATH=\"\$APP_DIR/bin:\$PATH\"
         source test/assert.sh
         source test/checks-${TASK}.sh
         finish
