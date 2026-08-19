@@ -74,6 +74,12 @@ the pins; they are never committed.
 prepares the environment the orchestrator reads at process start (GEN-A-7) and
 then invokes the orchestrator. It is the only supported way to run setup.
 
+**GEN-D-16 Pin registry.** The single file in which every pin (GEN-D-5) is
+recorded: `mise.toml`. It holds pins under three mechanisms - the
+orchestrator's own `min_version`, the `[tools]` table for dev tools
+(GEN-D-9), and `[env]` variables for build inputs (GEN-D-6) and runtime
+content (GEN-D-7).
+
 ---
 
 ## 2. The classification rule
@@ -288,6 +294,28 @@ without changing it.
 (GEN-A-8), the affected requirements document SHALL record a fallback approach
 that satisfies the same requirements without them.
 
+### Pins
+
+**GEN-R-20** Every pinned source SHALL appear in the registry table below,
+identified by the key under which the pin registry (GEN-D-16) records it. The
+table SHALL NOT restate the pinned value: it is an index into the registry,
+not a second copy of it, and GEN-R-7 continues to hold unchanged. A per-tool
+document MAY describe what its pin means but SHALL NOT reproduce the value.
+
+| Source | Classification | Mechanism | Key |
+|---|---|---|---|
+| mise | orchestrator | top-level | `min_version` |
+| cmake | dev tool | `[tools]` | `cmake` |
+| go | dev tool | `[tools]` | `go` |
+| neovim | build input | `[env]` | `NVIM_VERSION` |
+| oh-my-zsh | runtime content | `[env]` | `OHMYZSH_REF` |
+| zsh-autosuggestions | runtime content | `[env]` | `AUTOSUGGEST_REF` |
+| cmakelib | runtime content | `[env]` | `CMLIB_REF` |
+| cmakelib-component-cmconf | runtime content | `[env]` | `CMLIB_CMCONF_REF` |
+| cmakelib-component-cmdef | runtime content | `[env]` | `CMLIB_CMDEF_REF` |
+| cmakelib-component-cmutil | runtime content | `[env]` | `CMLIB_CMUTIL_REF` |
+| cmakelib-component-storage | runtime content | `[env]` | `CMLIB_STORAGE_REF` |
+
 ### Verifiability
 
 **GEN-R-12** Every requirement SHALL be verifiable by an observable check. A
@@ -382,6 +410,8 @@ naming every absent prerequisite when any is missing.
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
 | GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |
 | GEN-R-19 | Each unprivileged task (preflight, tools, fetch, render, link, flathub, preview) completes in an image where sudo is not installed; proven piecewise, not as one `all` run, because `all` is the ~15 GB application-download path |
+| GEN-D-16 | Every key named in the registry table resolves in the pin file |
+| GEN-R-20 | Searching the requirements directory for any pin-file value other than `min_version` returns nothing; `min_version` is excluded because its only appearances are dated observations ("VERIFIED - observed against mise <version>") naming the release a finding was made against, not restatements of the pin |
 
 ---
 

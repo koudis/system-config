@@ -29,7 +29,7 @@ orchestrator's registry, sourced from the upstream project's own releases.
 
 | Property | Value |
 |---|---|
-| Version | v3.30.1 |
+| Version | recorded in the pin registry (GEN-D-16) under key `cmake` |
 | Current pin mechanism | submodule gitlink plus a shell constant, in disagreement |
 | Required pin mechanism | single entry in the pin file |
 
@@ -63,6 +63,6 @@ prefix and the same single pin. The submodule is not reinstated.
 
 | Requirement | Check |
 |---|---|
-| CMAKE-R-1 | Reported version is v3.30.1 and no source tree is present after setup |
+| CMAKE-R-1 | Reported version is the pinned version (registry key `cmake`) and no source tree is present after setup |
 | CMAKE-R-2 | The binary resolves under the application directory |
 | CMAKE-R-3 | The Neovim build succeeds on a machine with no system CMake |

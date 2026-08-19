@@ -33,14 +33,15 @@ file, installed by setup like every other tool.
 
 | Property | Value |
 |---|---|
-| Version | 1.26.6 - latest stable at the time of pinning (released 2026-08-13) |
+| Version | recorded in the pin registry (GEN-D-16) under key `go` |
 | Current pin mechanism | none; a literal path fragment |
 | Required pin mechanism | single entry in the pin file |
 
 **GO-A-3** Go is a first-class tool in the orchestrator's own tool set, so no
 plugin or custom backend is required. Plain version numbers are accepted for
-1.21 and later; only 1.20 and earlier require special version syntax. At 1.26.6
-the plain form applies. `VERIFIED` - orchestrator language documentation.
+1.21 and later; only 1.20 and earlier require special version syntax. The
+pinned version is well past that boundary, so the plain form applies.
+`VERIFIED` - orchestrator language documentation.
 
 ## 5. Path exposure
 
