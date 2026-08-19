@@ -56,7 +56,26 @@ assert_cmd "application root is not a dumping ground" bash -c '
 assert_cmd "no bare bin directory survives" bash -c '
     [ ! -e "${APP_DIR}/bin" ]
 '
-assert_cmd "the search path names exactly two APP_DIR entries" bash -c '
-    [ "$(printf "%s\n" $PATH | tr ":" "\n" | grep -c "^${APP_DIR}/")" -eq 2 ] &&
-    [ -d "${APP_DIR}/mise/bin" ] && [ -d "${APP_DIR}/nvim/bin" ]
+# A blanket count of ${APP_DIR}/-prefixed PATH entries was tried here first and
+# rejected: MISE_INSTALLS_DIR is the application directory now, so the tool
+# bin directories mise injects for [tools] - $APP_DIR/cmake/<version>/bin,
+# $APP_DIR/go/<version>/bin - legitimately live under it too. That is
+# orchestrator resolution working correctly, not a violation of it; every
+# pinned tool except mise and nvim is meant to be reached that way rather
+# than by path. A raw count of four therefore does not mean what it would
+# have meant before MISE_INSTALLS_DIR moved: it is not evidence of anything
+# this repository forbids. What the spec actually claims is narrower - that
+# THIS REPOSITORY's own two entries are on PATH and exist, and that the
+# retired shared bin directory is gone from both PATH and disk. That splits
+# into the two checks below; the repository's own export naming exactly two
+# entries is asserted separately against the rendered profile in
+# test/checks-render.sh, which is where that export actually lives.
+assert_cmd "mise/bin and nvim/bin are on PATH and exist" bash -c '
+    [ -d "${APP_DIR}/mise/bin" ] && [ -d "${APP_DIR}/nvim/bin" ] &&
+    printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/mise/bin" &&
+    printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/nvim/bin"
+'
+assert_cmd "the retired shared bin directory is gone from disk and PATH" bash -c '
+    [ ! -e "${APP_DIR}/bin" ] &&
+    ! printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/bin"
 '

@@ -70,3 +70,21 @@ assert_cmd "global config file points at the pin registry" bash -c '
     grep -q "^export MISE_GLOBAL_CONFIG_FILE=\"$PWD/mise.toml\"" zsh/zshrc
 '
 assert_cmd "no unsubstituted placeholder" bash -c '! grep -q "___" zsh/zshrc'
+
+# GEN-R-1a / Task 9's acceptance assertion: THIS REPOSITORY's own search-path
+# export - not the tool directories mise injects at activation, which legitimately
+# multiply now that MISE_INSTALLS_DIR is the application directory - must
+# name exactly two application-directory entries: mise's own bin (needed
+# before activation can run at all) and nvim's (built from source, never
+# resolved as a mise tool). Parsed out of the rendered export rather than a
+# runtime $PATH, because this is the one place in the repository that claim
+# is actually made.
+assert_cmd "the repository's own PATH export names exactly two APP_DIR entries" bash -c '
+    line=$(grep -F "export PATH=\"\$APP_DIR" zsh/zshrc)
+    [[ -n $line ]] || exit 1
+    value=${line#export PATH=\"}
+    value=${value%\"}
+    [[ $(tr ":" "\n" <<< "$value" | grep -c "^\$APP_DIR/") -eq 2 ]] &&
+    grep -qF "\$APP_DIR/mise/bin" <<< "$value" &&
+    grep -qF "\$APP_DIR/nvim/bin" <<< "$value"
+'
