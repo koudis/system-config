@@ -54,3 +54,13 @@ assert_cmd "theme committed"   test -f zsh/custom/themes/muse.zsh-theme
 assert_cmd "patch file gone"   test ! -f zsh/muse_theme.patch
 assert_cmd "theme prompt is two lines" \
     bash -c '[[ $(sed -n 2p zsh/custom/themes/muse.zsh-theme) == *"FG[077]"* ]]'
+
+assert_cmd "global config file exported before activation" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_FILE=" zsh/zshrc &&
+    [ "$(grep -n "^export MISE_GLOBAL_CONFIG_FILE=" zsh/zshrc | cut -d: -f1)" \
+      -lt "$(grep -n "mise activate zsh" zsh/zshrc | cut -d: -f1)" ]
+'
+assert_cmd "global config file points at the pin registry" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_FILE=\"$PWD/mise.toml\"" zsh/zshrc
+'
+assert_cmd "no unsubstituted placeholder" bash -c '! grep -q "___" zsh/zshrc'
