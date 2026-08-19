@@ -50,6 +50,12 @@ org.kde.tellico
 # process-start prohibition GEN-R-16 covers. Its value names the binary's
 # current home; a later task moves the binary to App/mise/bin/mise and
 # repoints this one line.
+# This is also the first {{env.APP_DIR}} template in this file (GEN-R-16):
+# because this file is the orchestrator's global configuration, APP_DIR is
+# now required to parse it at all, from any process, not only from setup or
+# the rendered profile - a bare `mise` command with APP_DIR unset fails on
+# config parse before running anything. That is accepted deliberately, not a
+# bug: see GEN-R-16.
 ORCHESTRATOR_BIN = "{{env.APP_DIR}}/bin/mise"
 
 [tools]

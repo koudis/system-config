@@ -68,7 +68,7 @@ kept their numbers:
   replacing whatever it finds.
 
 New identifiers were appended for behaviour that implementation added:
-`GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-R-8b`, `GEN-R-15` through
+`GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-A-13`, `GEN-R-8b`, `GEN-R-15` through
 `GEN-R-18`, `GEN-R-19`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through
 `ZSH-R-14`, `ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`,
 `APPS-R-9`, `APPS-A-9`, `APPS-R-10` and `APPS-R-11`.

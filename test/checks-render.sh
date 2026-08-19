@@ -34,6 +34,12 @@ assert_cmd "MISE_DATA_DIR exported before mise is activated" bash -c '
     d=$(grep -n "^export MISE_DATA_DIR=" zsh/zshrc | head -1 | cut -d: -f1)
     a=$(grep -n "mise activate zsh"      zsh/zshrc | head -1 | cut -d: -f1)
     [[ -n $d && -n $a && $d -lt $a ]]'
+# Same shape, same reason (GEN-A-7): MISE_INSTALLS_DIR is read at process
+# start too, so it must be exported above activation as well.
+assert_cmd "MISE_INSTALLS_DIR exported before mise is activated" bash -c '
+    d=$(grep -n "^export MISE_INSTALLS_DIR=" zsh/zshrc | head -1 | cut -d: -f1)
+    a=$(grep -n "mise activate zsh"           zsh/zshrc | head -1 | cut -d: -f1)
+    [[ -n $d && -n $a && $d -lt $a ]]'
 
 # Step 4a: the cmakelib exports moved to mise.toml [env], so neither the
 # fragment nor its rendered output may come back.

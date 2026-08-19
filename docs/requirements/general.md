@@ -212,24 +212,42 @@ orchestrator compares against never reflects a pin change ahead of that
 decision. `VERIFIED` - observed while implementing the Neovim build; a version
 bump did not trigger a rebuild until the write was moved out.
 
-**GEN-A-13 A task body reaches the orchestrator only by absolute path.** When
-mise builds the environment for a task's own shell, it strips every inherited
-`PATH` entry that falls under the installs directory before injecting the
-resolved bin directories of the currently pinned tools; the injected tool
-paths still resolve inside a task body, but nothing else inherited from that
-directory survives, including wherever the orchestrator's own binary happens
-to be installed if that location is beneath the installs directory. A task
+**GEN-A-13 Computed environments drop installs-directory entries from PATH;
+reactivation drops only what mise recognizes as stale.** mise's own
+troubleshooting documentation (mise.jdx.dev/troubleshooting.html) states:
+"on reactivation mise now drops the stale install directories it finds on the
+inherited Path before adding the current toolset's" (v2026.5.18), and
+separately that "it collapses exact duplicates in the environments it
+computes (`mise x`, `mise run`, `mise env`, `mise doctor`)" (v2026.7.18). Both
+releases are at or before the pinned release, so both apply here. `mise run`
+is what builds a task body's own shell, so this is not limited to interactive
+use of the other three. Because `MISE_INSTALLS_DIR` now names the application
+directory, every path beneath it looks like an install directory to that
+logic, not only the versioned tool subdirectories it was written for -
+wherever the orchestrator's own binary is installed, being beneath the
+application directory, is caught the same way and dropped from the four
+computed surfaces even though it is not itself a tool mise manages. A task
 body that shells out to the bare command name therefore fails with "command
 not found" once the installs directory is the application root (GEN-R-1a).
-`VERIFIED - observed against mise 2026.8.6`: `mise exec -- sh -c 'echo $PATH'`
-run with the installs directory set to the application root omits an
-inherited entry naming the orchestrator's own install directory while still
-containing the resolved cmake and go bin directories; the same omission
-reproduced inside a real task body (`mise install`, run bare from within a
-task, failed with "mise: command not found") and independently inside the
-unprivileged container. Task bodies therefore invoke the orchestrator through
-an absolute path recorded once in `[env]` (`ORCHESTRATOR_BIN`), not by the
-bare command name.
+Reactivation is exempt from this in practice: it drops only entries it
+recognizes as stale tool installs, not the whole installs-directory subtree,
+so an ordinary directory such as `$APP_DIR/bin` is not a pattern it
+recognizes and survives untouched. This is what keeps ZSH-R-13 and ZSH-R-15
+valid after this task: the rendered profile's own `$APP_DIR/bin` export
+reaches every later interactive command through activation (`mise activate`,
+which drives `mise hook-env`), unaffected by the dropping the four computed
+surfaces perform. `VERIFIED - observed against mise 2026.8.6`, beyond what
+the citation above documents: with `$APP_DIR/bin` on the inherited `PATH` and
+the installs directory set to the application root, `mise exec -- sh -c
+'echo $PATH'` and `mise env -s bash` both omit the inherited entry while
+still injecting the resolved cmake and go bin directories; a task body probed
+the same way (`echo $PATH` as a task's own `run` body) showed the identical
+omission, reproduced independently inside the unprivileged container (`mise
+install`, run bare from within a task, failed with "mise: command not
+found"); `mise hook-env -s zsh` kept the inherited entry and additionally
+prepended the tool directories, consistent with the citation. Task bodies
+therefore invoke the orchestrator through an absolute path recorded once in
+`[env]` (`ORCHESTRATOR_BIN`), not by the bare command name.
 
 ---
 
@@ -380,6 +398,20 @@ orchestrator's own configuration, which is read too late (GEN-A-7). Both
 exporters SHALL derive the data directory and the installs directory from the
 application-directory setting rather than repeating a literal path (GEN-R-1b).
 
+Because this file is also the orchestrator's global configuration (ZSH-R-15)
+and templates directly on the application-directory setting
+(`{{env.APP_DIR}}`, first used by GEN-A-13's `ORCHESTRATOR_BIN`), the setting
+is not merely something the orchestrator reads once running - it is a
+precondition for parsing this file at all. mise SHALL fail outright, before
+any task runs, when the application-directory setting is absent from the
+environment; this follows directly from naming this file the global
+configuration and templating on the setting, and it is not itself a fourth
+place that exports the setting. Every sanctioned entry point (`setup`, the
+rendered login profile, and the harness's `test/run.sh`) already exports the
+application-directory setting for the reasons stated above, and none of them
+may drop that export merely because a given invocation appears not to need
+the data or installs directories - the file cannot be read without it.
+
 ### Destructive operations
 
 **GEN-R-17** A task SHALL NOT delete, or forcibly overwrite, a path it did not
@@ -439,7 +471,7 @@ naming every absent prerequisite when any is missing.
 | GEN-R-10 | Preview mode runs and changes nothing |
 | GEN-R-13 | Every managed tool has a matching document in this directory |
 | GEN-R-15 | The entry point given a task name runs that task and its declared predecessors only; given no argument it runs `all` |
-| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory and its installs directory both under the application directory; the orchestrator's configuration contains no assignment of either variable |
+| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory and its installs directory both under the application directory; the orchestrator's configuration contains no assignment of either variable; running the orchestrator with the application-directory setting unset fails config parsing outright rather than silently defaulting |
 | GEN-A-13 | Every task body that invokes the orchestrator does so through `"$ORCHESTRATOR_BIN"`, never through a bare `mise`; searching the task table for a bare invocation returns nothing |
 | GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
