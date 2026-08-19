@@ -41,7 +41,7 @@ org.kde.tellico
 
 [tools]
 cmake = "3.30.1"
-go    = "1.23.3"
+go    = "1.26.6"
 
 # [system.packages] does not exist in this mise version (GEN-A-8); the
 # installed release (2026.8.6) shipped the same subsystem under

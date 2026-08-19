@@ -450,7 +450,7 @@ rendered zshrc's `PATH`. On a fresh machine that PATH entry points at a
 directory that does not exist. `check_install_dir` does not catch it - it only
 tests for an empty string.
 
-Resolution: `[tools] go = "1.23.3"` in `mise.toml`. Version management is
+Resolution: a `[tools] go` pin in `mise.toml`. Version management is
 mise's core competency, the pin joins every other pin in one file, and the
 hardcoded `$HOME` path disappears. `___GO_BIN_DIR___` is then dropped from the
 template entirely, since `mise activate` puts Go on `PATH`.

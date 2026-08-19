@@ -33,13 +33,13 @@ file, installed by setup like every other tool.
 
 | Property | Value |
 |---|---|
-| Version | 1.23.3 - the version the hardcoded path refers to |
+| Version | 1.26.6 - latest stable at the time of pinning (released 2026-08-13) |
 | Current pin mechanism | none; a literal path fragment |
 | Required pin mechanism | single entry in the pin file |
 
 **GO-A-3** Go is a first-class tool in the orchestrator's own tool set, so no
 plugin or custom backend is required. Plain version numbers are accepted for
-1.21 and later; only 1.20 and earlier require special version syntax. At 1.23.3
+1.21 and later; only 1.20 and earlier require special version syntax. At 1.26.6
 the plain form applies. `VERIFIED` - orchestrator language documentation.
 
 ## 5. Path exposure
@@ -68,7 +68,7 @@ a template.
 
 | Requirement | Check |
 |---|---|
-| GO-R-1 | Go reports version 1.23.3 after setup on a clean machine |
+| GO-R-1 | Go reports the pinned version after setup on a clean machine |
 | GO-R-2 | Every entry in the resulting search path exists |
 | GO-R-3 | Searching the repository for a literal Go SDK path returns nothing |
 | GO-R-4 | Searching the repository for the Haskell environment path returns nothing |
