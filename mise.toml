@@ -25,15 +25,12 @@ CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
 # the shell template. This is what removes the hidden coupling flagged by
 # GEN-R-9, ZSH-R-9 and CMLIB-R-3.
 #
-# mise's built-in per-directory template value for the applicable config
-# root (the literal token is deliberately not spelled out here - GEN-R-3's
-# verification scans this file for it) is prohibited in this file: this file
-# is also loaded as the machine-global mise configuration, where that
-# default resolves to $HOME rather than the repository. Upstream does
-# document a knob to change that default (MISE_GLOBAL_CONFIG_ROOT), but it
-# is deliberately not reached for here - the paths these values need now
-# live under the application directory rather than the repository, so
-# {{env.APP_DIR}} addresses them directly and correctly by either route.
+# {{config_root}} is prohibited in this file: this file is also loaded as
+# the machine-global mise configuration, where the config root defaults to
+# $HOME rather than the repository. Upstream's MISE_GLOBAL_CONFIG_ROOT could
+# change that default, but is deliberately not used here - the paths this
+# configuration needs live under the application directory, and
+# {{env.APP_DIR}} addresses them correctly by either route.
 CMLIB_DIR                       = "{{env.APP_DIR}}/cmakelib/cmakelib"
 CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{env.APP_DIR}}/cmakelib/"
 

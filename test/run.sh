@@ -37,9 +37,10 @@ podman run --rm -i \
         set -euo pipefail
         # A clone, not 'cp -r': the harness must test what is committed. A
         # recursive copy drags in gitignored host state - a .build tree whose
-        # CMake cache holds host-absolute paths, populated _vendor/ clones, an
-        # already-rendered zsh/zshrc - which would let fetch, render and nvim
-        # pass by reusing the host's work instead of doing their own. Cloning
+        # CMake cache holds host-absolute paths, a populated
+        # zsh/custom/plugins/zsh-autosuggestions clone, an already-rendered
+        # zsh/zshrc - which would let fetch, render and nvim pass by reusing
+        # the host's work instead of doing their own. Cloning
         # also keeps a real .git, which the tasks need (git rev-parse
         # --show-toplevel) and the acceptance checks read (git ls-files -s,
         # git grep), so seeding from a plain 'git archive' export is not

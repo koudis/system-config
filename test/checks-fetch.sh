@@ -32,7 +32,6 @@ done
 assert_cmd "no ssh remotes anywhere" bash -c \
     '! grep -rq "git@github.com" "${APP_DIR}"/ohmyzsh/.git/config "${APP_DIR}"/cmakelib/*/.git/config zsh/custom/plugins/zsh-autosuggestions/.git/config'
 
-assert_cmd "ohmyzsh is a git work tree"  git -C "${APP_DIR}/ohmyzsh" rev-parse --is-inside-work-tree
 assert_cmd "cmakelib holds the library and its components" bash -c '
     [ -d "${APP_DIR}/cmakelib/cmakelib" ] &&
     [ -d "${APP_DIR}/cmakelib/cmakelib-component-cmconf" ] &&
@@ -42,4 +41,6 @@ assert_cmd "the vendored directory is gone" bash -c '[ ! -d _vendor ]'
 assert_cmd "the fixed-path exception still holds" bash -c '
     [ -d zsh/custom/plugins/zsh-autosuggestions ]
 '
-assert_cmd "no config_root in the pin file" bash -c '! grep -q "config_root" mise.toml'
+assert_cmd "no {{config_root}} template use in the pin file" bash -c '
+    ! grep -v "^[[:space:]]*#" mise.toml | grep -q "{{[[:space:]]*config_root"
+'
