@@ -475,6 +475,23 @@ naming every absent prerequisite when any is missing.
 tool. A superseded version is not reachable from any pin, and its presence
 makes resolution ambiguous where no configuration is in scope.
 
+`ACCEPTED 2026-08-19`: `MISE_INSTALLS_DIR` is exported into every interactive
+shell (GEN-R-16), so the application directory is a machine-wide shared
+install store, not one scoped to this repository. Pruning therefore scans
+that whole shared tree, not only the tools this repository pins. A version
+belonging to some other project's configuration is protected from removal
+solely by the orchestrator's own tracked-configs state: it survives only
+while some still-trusted configuration currently pins it. If that other
+project's checkout is deleted, moved, or untrusted, its pinned version stops
+being reachable from any trusted configuration and becomes prunable on the
+next routine setup run, not only when someone deliberately runs a global
+prune. This is accepted rather than overlooked: it follows directly from the
+shared-application-directory and global-configuration design settled by
+earlier requirements, and tracked-configs is precisely the mechanism meant to
+bound it - this requirement only wires that existing safety net to a more
+frequent trigger. A prune scoped to a hardcoded tool list was considered and
+rejected: it would duplicate what `[tools]` already declares.
+
 ---
 
 ## 5. Verification of the global requirements
