@@ -53,7 +53,10 @@ declared and installed, not assumed.
 tool is built rather than installed as a prebuilt binary; if the requirement is
 ever dropped, this tool SHOULD be reclassified as a dev tool (GEN-D-9).
 
-**NVIM-R-4** The install prefix SHALL be the application directory (GEN-R-1a).
+**NVIM-R-4** The install prefix SHALL be a directory named after the tool
+beneath the application directory (GEN-R-1a), not the application directory
+itself. Using the root as the prefix writes `bin/`, `lib64/` and `share/`
+into it, which is what the one-directory-per-tool rule exists to prevent.
 
 **NVIM-A-4** Building from a release tarball rather than a repository produces
 the correct version string at a release tag. The version generator falls back
@@ -124,7 +127,7 @@ removed outright under GEN-A-2.)
 | Requirement | Check |
 |---|---|
 | NVIM-R-3 | Reported build type is `RelWithDebInfo` |
-| NVIM-R-4 | The binary resolves under the application directory |
+| NVIM-R-4 | The binary resolves at `<application directory>/nvim/bin/nvim`, and the application root contains no `lib64` or `share/nvim` |
 | NVIM-A-4 | Reported version is exactly the pinned version (registry key `NVIM_VERSION`), with no development suffix |
 | NVIM-R-5 | The build succeeds on a machine with no system CMake installed |
 | NVIM-R-8 | The provider package is installed and the editor reports Python support |

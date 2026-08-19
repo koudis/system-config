@@ -297,7 +297,7 @@ printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
 [tasks.nvim]
 depends = ["tools", "preflight", "nvim-stamp"]
 sources = [".build/nvim.version"]
-outputs = ["{{env.APP_DIR}}/bin/nvim"]
+outputs = ["{{env.APP_DIR}}/nvim/bin/nvim"]
 run = """
 set -euo pipefail
 src=".build/neovim-${NVIM_VERSION}"
@@ -313,9 +313,9 @@ cd "$src"
 # [tools]-declared cmake on PATH for task execution, so command -v resolves
 # to the pinned mise-managed cmake rather than any system copy.
 make CMAKE_BUILD_TYPE=RelWithDebInfo \
-     CMAKE_INSTALL_PREFIX="$APP_DIR" \
+     CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" \
      CMAKE_PRG="$(command -v cmake)"
-make CMAKE_INSTALL_PREFIX="$APP_DIR" install
+make CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" install
 """
 
 # No sources/outputs (R12): mise has open upstream bugs where freshness

@@ -79,7 +79,7 @@ podman run --rm -i \
         # disappears from PATH the moment the eval above runs. Re-assert it
         # rather than skip the eval, which is still needed to pick up [env]
         # (FLATPAK_APPS, CMLIB_DIR, ...) for the checks below.
-        PATH=\"\$APP_DIR/bin:\$PATH\"
+        PATH=\"\$APP_DIR/bin:\$APP_DIR/nvim/bin:\$PATH\"
         source test/assert.sh
         source test/checks-${TASK}.sh
         finish
