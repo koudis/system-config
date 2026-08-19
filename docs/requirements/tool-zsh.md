@@ -43,6 +43,10 @@ runtime content under `_vendor/`; the intent of that formulation - fetched
 runtime content lives inside the repository and is never committed - is
 unchanged, and the path is ignored by git like the rest of it.
 
+As of 2026-08-17 this path is the single stated exception to GEN-R-3 rather
+than an instance of its general case: every other fetched source now lives in
+the application directory.
+
 ## 4. Oh My Zsh constraints
 
 These are upstream constraints, not preferences.

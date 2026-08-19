@@ -1,7 +1,6 @@
 **/.idea
 **/.vscode
 .build/
-_vendor/
 zsh/zshrc
 zsh/config
 vim/init.vim

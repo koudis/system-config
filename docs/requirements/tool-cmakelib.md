@@ -11,8 +11,9 @@ repository through environment variables.
 
 **Runtime content** (GEN-D-7). It is never compiled and never installed. It is
 a set of source trees read directly by CMake at build time in other projects.
-It therefore lives inside the repository, not the application directory
-(GEN-R-1c).
+It lives inside the application directory, not the repository (GEN-R-3): it
+is not the fixed-path exception that GEN-R-3 records, so it follows the
+general case.
 
 ## 3. Pins
 

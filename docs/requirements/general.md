@@ -43,7 +43,8 @@ keeping.
 
 **GEN-D-7 Runtime content.** An external source that persists on disk after
 setup and is read directly at runtime by a configured program. It is never
-compiled.
+compiled. It is contained in the application directory (GEN-D-13), except for
+the single fixed-path member of the GEN-R-3 exception.
 
 **GEN-D-8 System package.** Software installed by the operating system's
 package manager, machine-global and not version-pinned by this repository.
@@ -59,7 +60,9 @@ to a program at the location it expects, by symbolic link.
 
 **GEN-D-12 Containment.** The property that a file lives inside either the
 repository root (GEN-D-1) or the application directory (GEN-D-13). These are
-the only two locations this repository owns.
+the only two locations this repository owns. Most runtime content (GEN-D-7)
+satisfies this by living in the application directory; the single GEN-R-3
+exception satisfies it by living in the repository root instead.
 
 **GEN-D-13 Application directory.** The single filesystem location into which
 all installed artifacts are placed: compiled binaries, downloaded SDKs, and
@@ -291,10 +294,17 @@ locations SHALL NOT overlap.
 outside the repository SHALL be expressed relative to the user's home directory
 or, for installed artifacts, relative to the application-directory setting.
 
-**GEN-R-3** Fetched sources and orchestrator working state SHALL be contained in
-the repository but SHALL NOT be committed. Installed artifacts SHALL be
-contained in the application directory and SHALL NOT be committed. All are
+**GEN-R-3** Fetched sources SHALL be contained in the application directory
+and SHALL NOT be committed, unless the consuming program resolves them only
+from a fixed path inside the repository, in which case they SHALL be fetched
+directly to that path and the constraint SHALL be recorded as an assumption
+on the consuming tool. Orchestrator working state SHALL be contained in the
+repository but SHALL NOT be committed. Installed artifacts SHALL be contained
+in the application directory and SHALL NOT be committed. All are
 machine-local and reproducible from the pins.
+
+The exception has exactly one member: the autosuggestions plugin, earned by
+ZSH-A-7 and recorded in ZSH-R-12.
 
 **GEN-R-3a** The application directory SHALL be reconstructible from an empty
 state by a single setup run. Deleting it SHALL NOT lose information that exists
@@ -430,6 +440,13 @@ well as recursive deletion: a forced checkout discards uncommitted work just as
 effectively. An existing clean clone already at the pinned ref SHALL be reused
 in place and SHALL NOT be re-fetched.
 
+`WEAKENED 2026-08-17`: the submodule refusal is implemented with a query that
+is meaningful only for paths inside the repository, so for fetched sources
+that now live in the application directory it cannot fire. The unregistered-
+content and uncommitted-changes refusals still apply to those paths. The
+requirement is not withdrawn; this records that one of its three guards does
+not cover the relocated sources.
+
 **GEN-R-17b** For deployment (GEN-D-11) this means the link step SHALL refuse a
 target in the user's home directory that exists and is not already a symbolic
 link resolving into this repository. An existing symbolic link that does
@@ -463,7 +480,7 @@ naming every absent prerequisite when any is missing.
 | GEN-R-1b | Changing the setting and re-running relocates every artifact; the literal default path appears only in the setting's own definition |
 | GEN-R-1c | The application directory contains no templates, pins or documentation |
 | GEN-R-2 | Searching the repository for absolute home paths containing a literal username returns nothing |
-| GEN-R-3 | The ignore file covers the state, build and vendor directories; the application directory is outside the repository and untracked by construction |
+| GEN-R-3 | The ignore file covers the state and build directories; the application directory is outside the repository and untracked by construction; the one recorded exception (the autosuggestions plugin) is covered by its own ignore entry |
 | GEN-R-3a | Deleting the application directory and re-running setup restores a working environment |
 | GEN-R-4 | Two consecutive setup runs; the second reports no work and exits zero |
 | GEN-R-5 | The orchestrator can print a dependency graph |

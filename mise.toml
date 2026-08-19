@@ -24,8 +24,18 @@ CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
 # cmakelib's own outputs (CMLIB-R-2), declared here rather than emitted from
 # the shell template. This is what removes the hidden coupling flagged by
 # GEN-R-9, ZSH-R-9 and CMLIB-R-3.
-CMLIB_DIR                       = "{{config_root}}/_vendor/cmakelib"
-CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{config_root}}/_vendor/"
+#
+# mise's built-in per-directory template value for the applicable config
+# root (the literal token is deliberately not spelled out here - GEN-R-3's
+# verification scans this file for it) is prohibited in this file: this file
+# is also loaded as the machine-global mise configuration, where that
+# default resolves to $HOME rather than the repository. Upstream does
+# document a knob to change that default (MISE_GLOBAL_CONFIG_ROOT), but it
+# is deliberately not reached for here - the paths these values need now
+# live under the application directory rather than the repository, so
+# {{env.APP_DIR}} addresses them directly and correctly by either route.
+CMLIB_DIR                       = "{{env.APP_DIR}}/cmakelib/cmakelib"
+CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{env.APP_DIR}}/cmakelib/"
 
 # The seventeen desktop applications (APPS-R-11: they live here and nowhere
 # else, so GEN-R-7 still holds now that they are no longer in
@@ -198,7 +208,7 @@ run = '"$ORCHESTRATOR_BIN" install'
 run = """
 set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
-mkdir -p _vendor zsh/custom/plugins
+mkdir -p "$APP_DIR/cmakelib" zsh/custom/plugins
 
 # R25: never destroy a directory this task did not create. A registered
 # submodule gitlink, or any uncommitted local changes, stop the task with a
@@ -263,15 +273,16 @@ fetch_pinned() {
     fi
 }
 
-fetch_pinned _vendor/ohmyzsh https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH_REF"
+fetch_pinned "$APP_DIR/ohmyzsh" https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH_REF"
 # Oh My Zsh resolves custom plugins only under $ZSH_CUSTOM/plugins/, so this
-# clones to its real load path rather than _vendor/ plus a symlink (R9).
+# clones to its real load path (ZSH-A-7, ZSH-R-12). It is the one fetched
+# source that stays inside the repository.
 fetch_pinned zsh/custom/plugins/zsh-autosuggestions https://github.com/zsh-users/zsh-autosuggestions.git "$AUTOSUGGEST_REF"
-fetch_pinned _vendor/cmakelib https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
-fetch_pinned _vendor/cmakelib-component-cmconf  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
-fetch_pinned _vendor/cmakelib-component-cmdef   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
-fetch_pinned _vendor/cmakelib-component-cmutil  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
-fetch_pinned _vendor/cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib" https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmconf"  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmdef"   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmutil"  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-storage" https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
 """
 
 # A task gated by its own sources/outputs cannot be the one writing its
@@ -350,7 +361,7 @@ trap 'rm -f zsh/zshrc.mise-new vim/init.vim.mise-new' EXIT
 
 render() {
     local template="$1" out="$2" new="$2.mise-new"
-    sed -e "s|___OHMYZSH_PROJECT_DIR___|${root}/_vendor|g" \
+    sed -e "s|___OHMYZSH_PROJECT_DIR___|${APP_DIR}|g" \
         -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
         -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
         -e "s|___MISE_CONFIG_FILE___|${root}/mise.toml|g" \

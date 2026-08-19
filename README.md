@@ -88,17 +88,21 @@ sudo flatpak uninstall --system \
 These identifiers are declared once, in `mise.toml`'s `FLATPAK_APPS` - re-read
 them from there rather than trusting this copy if the two ever disagree.
 
-**2. `zsh/zshrc`.** It is gitignored, so a copy generated before the
-`vendor/` to `_vendor/` rename still names the old path, and `[tasks.render]`'s
-overwrite guard refuses by name on the first run afterwards. Delete the
-generated `zsh/zshrc` before re-running `./setup`; it will be regenerated from
-the template.
+**2. `zsh/zshrc`.** It is gitignored, so a copy generated before fetched
+runtime content moved out of the repository still names the old path, and
+`[tasks.render]`'s overwrite guard refuses by name on the first run
+afterwards. Delete the generated `zsh/zshrc` before re-running `./setup`; it
+will be regenerated from the template.
 
-**3. An orphaned `vendor/` tree.** The same rename dropped `vendor/` from
-`.gitignore` in favour of `_vendor/`, so a populated `vendor/` left over from
-before the rename now shows up as untracked content under `git status`. This
-is expected; leave it where it is. Do not add it back to `.gitignore` (that
-would only hide it) and do not delete it automatically - remove it yourself
-once you have confirmed you no longer need it.
+**3. Orphaned `vendor/` and `_vendor/` trees.** An earlier rename dropped
+`vendor/` from `.gitignore` in favour of `_vendor/`, and a later move dropped
+`_vendor/` itself once cmakelib and Oh My Zsh relocated to the application
+directory. Either tree left over from before its respective change now shows
+up as untracked content under `git status`. This is expected; leave it where
+it is. Do not add either back to `.gitignore` (that would only hide it) and do
+not delete either automatically - this is deliberate (GEN-R-17). The final
+task of the application-directory migration hands you the exact cleanup
+command; run it yourself once you have confirmed you no longer need the old
+content.
 
 [mise]: https://mise.jdx.dev
