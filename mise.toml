@@ -48,15 +48,16 @@ org.kde.tellico
 # an ordinary derived value consumed only by task bodies, not one mise reads
 # at process start (GEN-A-7), so [env] is where it belongs - it is not the
 # process-start prohibition GEN-R-16 covers. Its value names the binary's
-# current home; a later task moves the binary to App/mise/bin/mise and
-# repoints this one line.
+# current home, App/mise/bin/mise; mise already owns App/mise for its own
+# cache and state, so the binary lives alongside it rather than in a shared
+# App/bin.
 # This is also the first {{env.APP_DIR}} template in this file (GEN-R-16):
 # because this file is the orchestrator's global configuration, APP_DIR is
 # now required to parse it at all, from any process, not only from setup or
 # the rendered profile - a bare `mise` command with APP_DIR unset fails on
 # config parse before running anything. That is accepted deliberately, not a
 # bug: see GEN-R-16.
-ORCHESTRATOR_BIN = "{{env.APP_DIR}}/bin/mise"
+ORCHESTRATOR_BIN = "{{env.APP_DIR}}/mise/bin/mise"
 
 [tools]
 cmake = "3.30.1"
@@ -105,9 +106,9 @@ run = '"$ORCHESTRATOR_BIN" bootstrap packages apply --yes --manager dnf'
 # (`{{env.APP_DIR}}`) fails to resolve unless APP_DIR is forwarded too:
 # without it mise errors "Field `APP_DIR` is not defined" before the task
 # body ever runs. PATH stays forwarded as well - secure_path would otherwise
-# drop $APP_DIR/bin from what `mise bootstrap user apply` sees while running,
-# and nothing here proves that step never shells out to a bare tool name that
-# needs it.
+# drop $APP_DIR/mise/bin from what `mise bootstrap user apply` sees while
+# running, and nothing here proves that step never shells out to a bare tool
+# name that needs it.
 # This is the only literal sudo in this file (GEN-R-19); mise elevates on its
 # own for the dnf apply above.
 # depends = ["packages"]: mise runs independent dependencies of [tasks.system]

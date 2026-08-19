@@ -71,15 +71,15 @@ podman run --rm -i \
         # container verification.
         export MISE_DATA_DIR=\"\$APP_DIR/mise\"
         export MISE_INSTALLS_DIR=\"\$APP_DIR\"
-        PATH=\"\$APP_DIR/bin:\$PATH\"
+        PATH=\"\$APP_DIR/mise/bin:\$PATH\"
         command -v mise >/dev/null && eval \"\$(mise env -s bash)\"
         # mise env -s bash recomputes PATH the same way it does for any task
         # body (GEN-A-13): it strips every inherited entry under the installs
-        # directory, which now includes \$APP_DIR/bin itself, so mise
+        # directory, which now includes \$APP_DIR/mise/bin itself, so mise
         # disappears from PATH the moment the eval above runs. Re-assert it
         # rather than skip the eval, which is still needed to pick up [env]
         # (FLATPAK_APPS, CMLIB_DIR, ...) for the checks below.
-        PATH=\"\$APP_DIR/bin:\$APP_DIR/nvim/bin:\$PATH\"
+        PATH=\"\$APP_DIR/mise/bin:\$APP_DIR/nvim/bin:\$PATH\"
         source test/assert.sh
         source test/checks-${TASK}.sh
         finish

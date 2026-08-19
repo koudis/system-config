@@ -273,7 +273,10 @@ second install prefix such as a separate user binary directory.
 Installed artifacts SHALL be grouped one directory per tool, named after the
 tool, directly beneath the application directory. The prohibition on a second
 install prefix is unchanged: there remains exactly one prefix, and the
-per-tool directories are its contents, not rival prefixes.
+per-tool directories are its contents, not rival prefixes. This includes the
+orchestrator itself, which owns the directory named after it rather than a
+shared binary directory. There is no bare binary directory under the
+application directory.
 
 **GEN-R-1b** The application directory SHALL be configurable through a single
 declared setting, SHALL default to `~/App`, and SHALL be referenced everywhere
