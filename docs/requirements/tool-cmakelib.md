@@ -25,7 +25,7 @@ Five separate sources, all currently submodules.
 | component-cmconf | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMCONF_REF` | tag |
 | component-cmdef | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMDEF_REF` | tag |
 | component-cmutil | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMUTIL_REF` | commit SHA |
-| component-storage | `v1.0.0` | tag |
+| component-storage | recorded in the pin registry (GEN-D-16) under key `CMLIB_STORAGE_REF` | commit SHA |
 
 **CMLIB-A-1** One of the five is currently an orphaned gitlink: it exists in the
 tree but is not declared, so the submodule status command fails outright and a
@@ -40,6 +40,15 @@ undeclared fifth.
 **CMLIB-R-1** All five SHALL be fetched over HTTPS anonymously (GEN-A-4) and all
 five SHALL be declared. Three carry usable tags and SHOULD be pinned by tag; two
 sit between tags and SHALL be pinned by SHA.
+
+`CORRECTED 2026-08-19`: the index table above carried a restated tag value for
+component-storage, and it was stale - the component is pinned by SHA in the
+pin registry, as the other two SHA-pinned components are. The row now names
+its registry key like every sibling row (GEN-R-20). The split is therefore two
+by tag and three by SHA, not three and two; the requirement's normative
+sentence is left as written, because which components happen to sit on a
+usable tag is a fact about upstream at a moment in time, not a rule this
+repository imposes.
 
 ## 4. Declared inputs and outputs
 

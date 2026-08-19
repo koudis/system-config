@@ -88,3 +88,20 @@ assert_cmd "the repository's own PATH export names exactly two APP_DIR entries" 
     grep -qF "\$APP_DIR/mise/bin" <<< "$value" &&
     grep -qF "\$APP_DIR/nvim/bin" <<< "$value"
 '
+
+# ZSH-R-13 in full. The three checks above each compare one export against the
+# activation line; the requirement also fixes the order of the five relative to
+# one another, and APP_DIR and the search path had no position check at all.
+# One comparison chain covers all of it, so deleting any of the five (an empty
+# line number fails the -n test) or moving one out of sequence fails here.
+assert_cmd "the five exports appear in the declared order above activation" bash -c '
+    n() { grep -n "$1" zsh/zshrc | head -1 | cut -d: -f1; }
+    a=$(n "^export APP_DIR=")
+    d=$(n "^export MISE_DATA_DIR=")
+    i=$(n "^export MISE_INSTALLS_DIR=")
+    p=$(n "^export PATH=\"\$APP_DIR")
+    g=$(n "^export MISE_GLOBAL_CONFIG_FILE=")
+    act=$(n "mise activate zsh")
+    [[ -n $a && -n $d && -n $i && -n $p && -n $g && -n $act ]] || exit 1
+    [[ $a -lt $d && $d -lt $i && $i -lt $p && $p -lt $g && $g -lt $act ]]
+'

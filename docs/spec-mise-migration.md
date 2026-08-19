@@ -150,6 +150,21 @@ the rest of the work untestable.
 The wrapper is not the only exporter of `MISE_DATA_DIR`. The rendered zshrc is
 the second, and legitimately so - see 5.4.
 
+**Superseded in place (2026-08-19), for the second process-start variable.**
+Step 2 above describes the wrapper as exporting `MISE_DATA_DIR` alone. It
+exports two variables read at process start, not one: `MISE_DATA_DIR` beneath
+the application directory, and `MISE_INSTALLS_DIR` set to the application
+directory itself, so that each managed tool owns a directory named after it
+directly beneath that root instead of being buried under the data directory's
+own `installs/` tree. Everything this section says about why a process-start
+variable cannot come from `[env]` applies to the second one identically, and
+so does the two-exporter note above: the rendered zshrc exports both. The
+third process-start variable, `MISE_GLOBAL_CONFIG_FILE`, is exported by the
+rendered zshrc only and is superseded separately in section 5 - the wrapper
+does not need it, because it runs from inside the repository where the
+configuration is found by upward walk anyway. See GEN-R-16 and the
+application-layout spec.
+
 ### 5.2 System packages - use `[bootstrap.packages]`, with a fallback
 
 mise has native declarative system-package support covering exactly this

@@ -6,7 +6,15 @@ FROM registry.fedoraproject.org/fedora:44
 # installs the right things" - the latter is what test/Containerfile covers.
 # sudo is deliberately absent, so any elevation left in the unprivileged phase
 # fails the run rather than passing silently (GEN-R-19).
-RUN dnf -y install git curl gcc make ninja-build gettext glibc-gconv-extra flatpak \
+# zsh is here for the same reason as the rest: the privileged phase declares it
+# in [bootstrap.packages], so a machine that has run './setup system' has it.
+# It is not a preflight prerequisite (preflight gates only what the unprivileged
+# tasks execute, and no task runs zsh), but the rendered login profile is the
+# only place MISE_GLOBAL_CONFIG_FILE is exported, and without a zsh here the
+# machine-wide-resolution claim that ZSH-R-15, GO-R-2 and spec section 6 all
+# rest on cannot be checked at all - only that the export is rendered in the
+# right position, which test/checks-render.sh already covers.
+RUN dnf -y install git curl gcc make ninja-build gettext glibc-gconv-extra flatpak zsh \
     && dnf clean all
 
 # Fedora's base image ships sudo, so omitting it from the install list is not

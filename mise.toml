@@ -215,12 +215,39 @@ fi
 # remove the stale version without a prompt. `mise uninstall` was rejected:
 # it requires naming the version to remove, which would restate a pin outside
 # the single pin location (GEN-R-7).
+#
+# The prune names the tools it may touch. Unscoped, `prune --tools` is
+# unbounded: MISE_INSTALLS_DIR is the application directory, so mise reads
+# every <name>/<version> directory beneath it as an install of one of its core
+# backends and schedules for deletion any version no trusted configuration
+# pins - including a directory the user created and this repository has never
+# written to. Observed against 2026.8.6 in a scratch installs tree: a
+# hand-kept `node/20.0.0` was scheduled for removal, with MISE_YES=1 answering
+# the confirmation that would otherwise have stopped it. That is the deletion
+# GEN-R-17 forbids. Naming the pinned tools bounds the run to what GEN-R-21
+# actually claims.
+#
+# The names are derived from [tools] rather than restated, the same way
+# ./setup derives min_version and test/checks-bootstrap.sh derives the pin it
+# asserts (GEN-R-7). The empty-result guard is load-bearing rather than
+# defensive noise: no tool arguments is the unbounded form, so a [tools] table
+# that cannot be read has to stop the task instead of falling back to it.
+# awk's index() and a bracket-free grep, because a TOML basic string treats a
+# backslash as an escape and a sed address for `[tools]` needs two of them.
 [tasks.tools]
 depends = ["preflight"]
 run = """
 set -euo pipefail
 "$ORCHESTRATOR_BIN" install
-MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools
+root="$(git rev-parse --show-toplevel)"
+pinned=$(awk 'index($0,"[tools]")==1 {f=1; next} index($0,"[")==1 {f=0} f' "$root/mise.toml" \
+         | grep -E '^[A-Za-z]' | cut -d= -f1 | tr -d '[:blank:]' || true)
+if [[ -z $pinned ]]; then
+    echo "tools: no [tools] entries found in $root/mise.toml" >&2
+    echo "tools: refusing an unscoped prune of ${MISE_INSTALLS_DIR-}" >&2
+    exit 1
+fi
+MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools $pinned
 """
 
 [tasks.fetch]

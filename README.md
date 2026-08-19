@@ -94,15 +94,40 @@ runtime content moved out of the repository still names the old path, and
 afterwards. Delete the generated `zsh/zshrc` before re-running `./setup`; it
 will be regenerated from the template.
 
-**3. Orphaned `vendor/` and `_vendor/` trees.** An earlier rename dropped
-`vendor/` from `.gitignore` in favour of `_vendor/`, and a later move dropped
-`_vendor/` itself once cmakelib and Oh My Zsh relocated to the application
-directory. Either tree left over from before its respective change now shows
-up as untracked content under `git status`. This is expected; leave it where
-it is. Do not add either back to `.gitignore` (that would only hide it) and do
-not delete either automatically - this is deliberate (GEN-R-17). The final
-task of the application-directory migration hands you the exact cleanup
-command; run it yourself once you have confirmed you no longer need the old
-content.
+**3. Paths the new layout leaves behind.** Setup installs into the new
+locations; it never removes the old ones. Nothing reads any of the paths below
+once this change lands, and deleting a path a previous version of this
+repository created is exactly the decision `GEN-R-17` exists to refuse - so
+they are left for you, and `git status` reporting the two in-repository ones
+as untracked is expected. Do not add them back to `.gitignore`; that only
+hides them.
+
+In the repository:
+
+- `_vendor/` - held cmakelib and Oh My Zsh before they moved to `$APP_DIR`.
+- `vendor/` - the name `_vendor/` replaced in an earlier rename.
+
+Under `$APP_DIR` (default `~/App`):
+
+- `bin/` - the shared binary directory. mise now lives at `$APP_DIR/mise/bin`
+  and the Neovim build installs to `$APP_DIR/nvim/bin`, so nothing writes here.
+- `lib64/` and `share/nvim/` - the old Neovim install spilled across the
+  application root, because its prefix was `$APP_DIR` itself rather than
+  `$APP_DIR/nvim`. The same install also wrote `share/man`, `share/icons` and
+  `share/applications`; look before removing those, since other software may
+  have written there too.
+- `mise/installs/` - where mise kept every tool before `MISE_INSTALLS_DIR`
+  became `$APP_DIR` and each tool got a directory named after it.
+
+Once you have confirmed you no longer need the old content, remove them
+yourself. Every path is named in full below; do not substitute a glob:
+
+```bash
+rm -rf _vendor vendor
+rm -rf "${APP_DIR:-$HOME/App}/bin" \
+       "${APP_DIR:-$HOME/App}/lib64" \
+       "${APP_DIR:-$HOME/App}/share/nvim" \
+       "${APP_DIR:-$HOME/App}/mise/installs"
+```
 
 [mise]: https://mise.jdx.dev

@@ -224,22 +224,28 @@ separately that "it collapses exact duplicates in the environments it
 computes (`mise x`, `mise run`, `mise env`, `mise doctor`)" (v2026.7.18). Both
 releases are at or before the pinned release, so both apply here. `mise run`
 is what builds a task body's own shell, so this is not limited to interactive
-use of the other three. Because `MISE_INSTALLS_DIR` now names the application
-directory, every path beneath it looks like an install directory to that
-logic, not only the versioned tool subdirectories it was written for -
-wherever the orchestrator's own binary is installed, being beneath the
-application directory, is caught the same way and dropped from the four
-computed surfaces even though it is not itself a tool mise manages. A task
-body that shells out to the bare command name therefore fails with "command
-not found" once the installs directory is the application root (GEN-R-1a).
-Reactivation is exempt from this in practice: it drops only entries it
-recognizes as stale tool installs, not the whole installs-directory subtree,
-so an ordinary directory such as `$APP_DIR/bin` is not a pattern it
+use of the other three. The clause that accounts for what is observed here is
+the first one, about dropping stale install directories found on the
+inherited path - not the second, about collapsing exact duplicates: the entry
+that disappears is unique on the inherited path, so there is no duplicate to
+collapse. Because `MISE_INSTALLS_DIR` now names the application directory,
+every path beneath it is a candidate for that first test, not only the
+versioned tool subdirectories it was written for - wherever the orchestrator's
+own binary is installed, being beneath the application directory, is caught
+the same way and dropped from the four computed surfaces even though it is
+not itself a tool mise manages. A task body that shells out to the bare
+command name therefore fails with "command not found" once the installs
+directory is the application root (GEN-R-1a).
+The same clause is applied far more narrowly on reactivation, which is why
+reactivation is exempt in practice: there it drops only entries it recognizes
+as stale tool installs, not the whole installs-directory subtree, so an
+ordinary directory such as `$APP_DIR/mise/bin` or `$APP_DIR/nvim/bin` -
+neither of them a versioned install directory - is not a pattern it
 recognizes and survives untouched. This is what keeps ZSH-R-13 and ZSH-R-15
-valid after this task: the rendered profile's own `$APP_DIR/bin` export
-reaches every later interactive command through activation (`mise activate`,
-which drives `mise hook-env`), unaffected by the dropping the four computed
-surfaces perform. `VERIFIED - observed against mise 2026.8.6`, beyond what
+valid after this task: the rendered profile's own `$APP_DIR/mise/bin` and
+`$APP_DIR/nvim/bin` exports reach every later interactive command through
+activation (`mise activate`, which drives `mise hook-env`), unaffected by the
+dropping the four computed surfaces perform. `VERIFIED - observed against mise 2026.8.6`, beyond what
 the citation above documents: with `$APP_DIR/bin` on the inherited `PATH` and
 the installs directory set to the application root, `mise exec -- sh -c
 'echo $PATH'` and `mise env -s bash` both omit the inherited entry while
@@ -425,6 +431,18 @@ application-directory setting for the reasons stated above, and none of them
 may drop that export merely because a given invocation appears not to need
 the data or installs directories - the file cannot be read without it.
 
+`CLARIFIED 2026-08-19`: the paragraph above names three exporters where the
+normative sentence says exactly two, and the two statements are about
+different things. The normative count governs the delivered system: on a
+configured machine there are exactly two exporters, the entry point and the
+rendered login-shell profile, and a third would be the duplication the
+requirement forbids. `test/run.sh` is not a third: it runs only inside a
+throwaway container, where it reconstructs the same values the entry point
+exported in a child process that never reached the harness's own shell, and
+it derives them from the application-directory setting rather than restating
+literals. Verification reproducing the environment under test is not the
+system exporting it twice. The count stands as written.
+
 ### Destructive operations
 
 **GEN-R-17** A task SHALL NOT delete, or forcibly overwrite, a path it did not
@@ -492,6 +510,48 @@ bound it - this requirement only wires that existing safety net to a more
 frequent trigger. A prune scoped to a hardcoded tool list was considered and
 rejected: it would duplicate what `[tools]` already declares.
 
+`NARROWED 2026-08-19`: the paragraph above describes the unscoped prune as it
+was first implemented and no longer describes what setup does. It is kept as
+the record of what was accepted and why, and is superseded from here down.
+
+The acceptance was wrong on its radius. mise enumerates the installs
+directory against its own core backends as `<tool>/<version>`, so with the
+installs directory set to the application directory the unscoped prune reaches
+every directory a user happens to keep at `<application directory>/<core tool
+name>/<version>/` - `python`, `node`, `ruby`, `java`, `bun`, `deno`, `zig` and
+the rest - not only versions some other project's configuration pins. Such a
+directory has no tracked configuration behind it, so tracked-configs is not a
+safety net for it at all: it is deleted on the first routine unprivileged
+setup run, with the confirm-everything flag suppressing the prompt.
+`VERIFIED - observed against mise 2026.8.6` in a scratch installs tree: an
+unscoped `prune --tools --dry-run` scheduled a hand-created `node/20.0.0` for
+removal, while `kubectl/1.30.0` and `MyNotes/2026` - neither a core backend
+name - were left alone.
+
+The prune is therefore scoped to the tools this repository pins, by name.
+The names are derived from the pin file's `[tools]` table at run time and not
+restated anywhere, so GEN-R-7 is untouched; deriving rather than hardcoding is
+what the rejection above was actually objecting to, and it is the same
+technique the entry point already uses for `min_version`. The unscoped form is
+refused outright when the derivation yields nothing, because no tool argument
+is what makes the run unbounded.
+
+The radius after this change is exactly what the normative sentence claims and
+no more: versions of the tools named in this repository's `[tools]` table, and
+of no other tool. Within that radius the earlier paragraph still holds - a
+version of a pinned tool that some other project's configuration also pins
+survives only while that configuration stays tracked and trusted, and
+tracked-configs is genuinely the mechanism bounding that case. Outside it,
+nothing is examined at all.
+
+This is what reconciles GEN-R-21 with GEN-R-17. Setup still deletes a path it
+did not itself create - a version of a pinned tool installed by some other
+mise configuration - and that is the accepted residue, bounded above and
+argued for by the ambiguity the normative sentence names. What it no longer
+does is delete paths that have nothing to do with any tool this repository
+manages, which is the case GEN-R-17 exists to refuse and which the fetch and
+link steps refuse by name.
+
 ---
 
 ## 5. Verification of the global requirements
@@ -522,7 +582,7 @@ rejected: it would duplicate what `[tools]` already declares.
 | GEN-R-19 | Each unprivileged task (preflight, tools, fetch, render, link, flathub, preview) completes in an image where sudo is not installed; proven piecewise, not as one `all` run, because `all` is the ~15 GB application-download path |
 | GEN-D-16 | Every key named in the registry table resolves in the pin file |
 | GEN-R-20 | Searching the requirements directory for any pin-file value other than `min_version` returns nothing; `min_version` is excluded because its only appearances are dated observations ("VERIFIED - observed against mise <version>") naming the release a finding was made against, not restatements of the pin |
-| GEN-R-21 | After a pin bump and a setup run, exactly one version of the bumped tool is installed, and it is the pinned one |
+| GEN-R-21 | After a setup run, exactly one full-version directory exists beneath each pinned tool's own directory, and the tool reports the pinned version; the prune step names the tools it may remove and refuses to run when it can name none; a directory shaped like an install of a core tool this repository does not pin survives a second run of the tools task. The pin-bump wording of the requirement is not itself exercised - the harness installs from scratch and never bumps a pin - so removal of a superseded version rests on the dated observation recorded above rather than on an automated check |
 
 ---
 
