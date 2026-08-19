@@ -20,3 +20,9 @@ assert_cmd  "preview-system mode runs"     bash -c 'cd /home/tester/work && mise
 assert_cmd  "preview names no dnf"         bash -c '
     ! awk "/^\[tasks\.preview\]\$/{f=1;next} /^\[/{f=0} f" \
         /home/tester/work/mise.toml | grep -q "manager dnf"'
+assert_cmd "the orchestrator lives in its own directory" bash -c '
+    [ -x "${APP_DIR}/mise/bin/mise" ]
+'
+assert_cmd "no bare bin directory under APP_DIR" bash -c '
+    [ ! -e "${APP_DIR}/bin" ]
+'
