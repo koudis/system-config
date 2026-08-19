@@ -187,19 +187,41 @@ if [[ -n "${missing[*]-}" ]]; then
 fi
 """
 
-# Decorative by mise's design, kept deliberately: mise installs everything in
-# [tools] before it runs any task at all, so `mise install` here has nothing
-# left to do and depends = ["preflight"] gates nothing - `./setup fetch` on a
-# fresh box downloads both SDKs on the way to fetching. Removing the task would
-# leave no way to ask for the SDK step alone, which is what [tasks.all] and the
-# harness (`test/run.sh tools tools unprivileged`) name, so it stays as that
-# entry point. Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13):
-# the installs directory is now the application root, and mise strips any
-# inherited PATH entry beneath it - including wherever the orchestrator's own
-# binary lives - before handing this task its shell.
+# The `mise install` line is decorative by mise's design, kept deliberately:
+# mise installs everything in [tools] before it runs any task at all, so this
+# line has nothing left to do and depends = ["preflight"] gates nothing -
+# `./setup fetch` on a fresh box downloads both SDKs on the way to fetching.
+# Removing the task would leave no way to ask for the SDK step alone, which is
+# what [tasks.all] and the harness (`test/run.sh tools tools unprivileged`)
+# name, so it stays as that entry point. Invoked through ORCHESTRATOR_BIN, not
+# bare `mise` (GEN-A-13): the installs directory is now the application root,
+# and mise strips any inherited PATH entry beneath it - including wherever the
+# orchestrator's own binary lives - before handing this task its shell.
+#
+# GEN-R-21: leaves exactly one installed version of each pinned tool. A
+# superseded version is not reachable from any pin, and keeping it makes
+# resolution ambiguous where no configuration is in scope.
+#
+# Verified empirically against upstream source and the real binary: bare
+# `mise prune` only removes tracked configuration links here - it hits a
+# per-version confirmation prompt (src/cli/prune.rs) and, unanswered in a
+# non-interactive shell, silently skips the tool-deletion step, leaving a
+# stale install in place. `--dry-run` bypasses that same prompt, which is why
+# it reports a removal that the real run never performs. `--tools` (one of
+# prune's own flags, alongside --dry-run, --configs, --dry-run-code and
+# --monorepo) scopes the run to unused tool versions; `MISE_YES=1` is the
+# global confirm-everything flag (not a `prune` flag, so it cannot go after
+# the subcommand) that answers the prompt instead of a human. Together they
+# remove the stale version without a prompt. `mise uninstall` was rejected:
+# it requires naming the version to remove, which would restate a pin outside
+# the single pin location (GEN-R-7).
 [tasks.tools]
 depends = ["preflight"]
-run = '"$ORCHESTRATOR_BIN" install'
+run = """
+set -euo pipefail
+"$ORCHESTRATOR_BIN" install
+MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools
+"""
 
 [tasks.fetch]
 run = """

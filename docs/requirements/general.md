@@ -469,6 +469,12 @@ phase. The unprivileged phase SHALL invoke no elevation, and SHALL verify its
 system prerequisites before running any task that needs them, failing and
 naming every absent prerequisite when any is missing.
 
+### Tool versions
+
+**GEN-R-21** Setup SHALL leave exactly one installed version of each pinned
+tool. A superseded version is not reachable from any pin, and its presence
+makes resolution ambiguous where no configuration is in scope.
+
 ---
 
 ## 5. Verification of the global requirements
@@ -499,6 +505,7 @@ naming every absent prerequisite when any is missing.
 | GEN-R-19 | Each unprivileged task (preflight, tools, fetch, render, link, flathub, preview) completes in an image where sudo is not installed; proven piecewise, not as one `all` run, because `all` is the ~15 GB application-download path |
 | GEN-D-16 | Every key named in the registry table resolves in the pin file |
 | GEN-R-20 | Searching the requirements directory for any pin-file value other than `min_version` returns nothing; `min_version` is excluded because its only appearances are dated observations ("VERIFIED - observed against mise <version>") naming the release a finding was made against, not restatements of the pin |
+| GEN-R-21 | After a pin bump and a setup run, exactly one version of the bumped tool is installed, and it is the pinned one |
 
 ---
 
