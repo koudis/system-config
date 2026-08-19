@@ -43,7 +43,8 @@ keeping.
 
 **GEN-D-7 Runtime content.** An external source that persists on disk after
 setup and is read directly at runtime by a configured program. It is never
-compiled.
+compiled. It is contained in the application directory (GEN-D-13), except for
+the single fixed-path member of the GEN-R-3 exception.
 
 **GEN-D-8 System package.** Software installed by the operating system's
 package manager, machine-global and not version-pinned by this repository.
@@ -59,7 +60,9 @@ to a program at the location it expects, by symbolic link.
 
 **GEN-D-12 Containment.** The property that a file lives inside either the
 repository root (GEN-D-1) or the application directory (GEN-D-13). These are
-the only two locations this repository owns.
+the only two locations this repository owns. Most runtime content (GEN-D-7)
+satisfies this by living in the application directory; the single GEN-R-3
+exception satisfies it by living in the repository root instead.
 
 **GEN-D-13 Application directory.** The single filesystem location into which
 all installed artifacts are placed: compiled binaries, downloaded SDKs, and
@@ -73,6 +76,12 @@ the pins; they are never committed.
 **GEN-D-15 Entry point.** The single executable at the repository root that
 prepares the environment the orchestrator reads at process start (GEN-A-7) and
 then invokes the orchestrator. It is the only supported way to run setup.
+
+**GEN-D-16 Pin registry.** The single file in which every pin (GEN-D-5) is
+recorded: `mise.toml`. It holds pins under three mechanisms - the
+orchestrator's own `min_version`, the `[tools]` table for dev tools
+(GEN-D-9), and `[env]` variables for build inputs (GEN-D-6) and runtime
+content (GEN-D-7).
 
 ---
 
@@ -122,13 +131,24 @@ uploaded a key to any forge. Every source URL SHALL therefore be reachable
 anonymously over HTTPS. `VERIFIED` - this is the failure mode of the current
 repository, where four sources use SSH URLs.
 
-**GEN-A-5 `sudo` is available and interactive.** System package installation
-requires elevation and the user is present to authorise it. `VERIFIED`.
+**GEN-A-5 `sudo` is available and interactive during the privileged phase.**
+System package installation requires elevation and the user is present to
+authorise it. This holds for the privileged phase only; the unprivileged phase
+requires no elevation and is verified where `sudo` is not installed (GEN-R-19).
+`VERIFIED`.
 
 **GEN-A-6 The orchestrator's configuration is found from the repository root.**
 Configuration resolution walks upward from the working directory, so a
 repository-root configuration file is the native case and no machine-global
 configuration participates. `VERIFIED` - upstream configuration documentation.
+
+`SUPERSEDED IN PART 2026-08-17`: the closing clause ("no machine-global
+configuration participates") no longer holds. Upward resolution is unchanged
+and still correct; what changed is that this repository now names its own
+configuration file as the global one (ZSH-R-15), deliberately, so that pinned
+tools resolve outside the repository. No pin is duplicated by this - the
+global configuration is the pin registry (GEN-D-16), reached by a second
+route.
 
 **GEN-A-7 The tool-install location is fixed before the orchestrator starts.**
 The variable controlling where tools are installed is read at process start and
@@ -195,6 +215,49 @@ orchestrator compares against never reflects a pin change ahead of that
 decision. `VERIFIED` - observed while implementing the Neovim build; a version
 bump did not trigger a rebuild until the write was moved out.
 
+**GEN-A-13 Computed environments drop installs-directory entries from PATH;
+reactivation drops only what mise recognizes as stale.** mise's own
+troubleshooting documentation (mise.jdx.dev/troubleshooting.html) states:
+"on reactivation mise now drops the stale install directories it finds on the
+inherited Path before adding the current toolset's" (v2026.5.18), and
+separately that "it collapses exact duplicates in the environments it
+computes (`mise x`, `mise run`, `mise env`, `mise doctor`)" (v2026.7.18). Both
+releases are at or before the pinned release, so both apply here. `mise run`
+is what builds a task body's own shell, so this is not limited to interactive
+use of the other three. The clause that accounts for what is observed here is
+the first one, about dropping stale install directories found on the
+inherited path - not the second, about collapsing exact duplicates: the entry
+that disappears is unique on the inherited path, so there is no duplicate to
+collapse. Because `MISE_INSTALLS_DIR` now names the application directory,
+every path beneath it is a candidate for that first test, not only the
+versioned tool subdirectories it was written for - wherever the orchestrator's
+own binary is installed, being beneath the application directory, is caught
+the same way and dropped from the four computed surfaces even though it is
+not itself a tool mise manages. A task body that shells out to the bare
+command name therefore fails with "command not found" once the installs
+directory is the application root (GEN-R-1a).
+The same clause is applied far more narrowly on reactivation, which is why
+reactivation is exempt in practice: there it drops only entries it recognizes
+as stale tool installs, not the whole installs-directory subtree, so an
+ordinary directory such as `$APP_DIR/mise/bin` or `$APP_DIR/nvim/bin` -
+neither of them a versioned install directory - is not a pattern it
+recognizes and survives untouched. This is what keeps ZSH-R-13 and ZSH-R-15
+valid after this task: the rendered profile's own `$APP_DIR/mise/bin` and
+`$APP_DIR/nvim/bin` exports reach every later interactive command through
+activation (`mise activate`, which drives `mise hook-env`), unaffected by the
+dropping the four computed surfaces perform. `VERIFIED - observed against mise 2026.8.6`, beyond what
+the citation above documents: with `$APP_DIR/bin` on the inherited `PATH` and
+the installs directory set to the application root, `mise exec -- sh -c
+'echo $PATH'` and `mise env -s bash` both omit the inherited entry while
+still injecting the resolved cmake and go bin directories; a task body probed
+the same way (`echo $PATH` as a task's own `run` body) showed the identical
+omission, reproduced independently inside the unprivileged container (`mise
+install`, run bare from within a task, failed with "mise: command not
+found"); `mise hook-env -s zsh` kept the inherited entry and additionally
+prepended the tool directories, consistent with the citation. Task bodies
+therefore invoke the orchestrator through an absolute path recorded once in
+`[env]` (`ORCHESTRATOR_BIN`), not by the bare command name.
+
 ---
 
 ## 4. Global requirements
@@ -216,6 +279,14 @@ application directory (GEN-D-13). No installed artifact SHALL be written to any
 other location outside the repository. In particular there SHALL NOT be a
 second install prefix such as a separate user binary directory.
 
+Installed artifacts SHALL be grouped one directory per tool, named after the
+tool, directly beneath the application directory. The prohibition on a second
+install prefix is unchanged: there remains exactly one prefix, and the
+per-tool directories are its contents, not rival prefixes. This includes the
+orchestrator itself, which owns the directory named after it rather than a
+shared binary directory. There is no bare binary directory under the
+application directory.
+
 **GEN-R-1b** The application directory SHALL be configurable through a single
 declared setting, SHALL default to `~/App`, and SHALL be referenced everywhere
 else by that setting rather than by a literal path. Changing the setting SHALL
@@ -229,10 +300,17 @@ locations SHALL NOT overlap.
 outside the repository SHALL be expressed relative to the user's home directory
 or, for installed artifacts, relative to the application-directory setting.
 
-**GEN-R-3** Fetched sources and orchestrator working state SHALL be contained in
-the repository but SHALL NOT be committed. Installed artifacts SHALL be
-contained in the application directory and SHALL NOT be committed. All are
+**GEN-R-3** Fetched sources SHALL be contained in the application directory
+and SHALL NOT be committed, unless the consuming program resolves them only
+from a fixed path inside the repository, in which case they SHALL be fetched
+directly to that path and the constraint SHALL be recorded as an assumption
+on the consuming tool. Orchestrator working state SHALL be contained in the
+repository but SHALL NOT be committed. Installed artifacts SHALL be contained
+in the application directory and SHALL NOT be committed. All are
 machine-local and reproducible from the pins.
+
+The exception has exactly one member: the autosuggestions plugin, earned by
+ZSH-A-7 and recorded in ZSH-R-12.
 
 **GEN-R-3a** The application directory SHALL be reconstructible from an empty
 state by a single setup run. Deleting it SHALL NOT lose information that exists
@@ -285,6 +363,28 @@ without changing it.
 (GEN-A-8), the affected requirements document SHALL record a fallback approach
 that satisfies the same requirements without them.
 
+### Pins
+
+**GEN-R-20** Every pinned source SHALL appear in the registry table below,
+identified by the key under which the pin registry (GEN-D-16) records it. The
+table SHALL NOT restate the pinned value: it is an index into the registry,
+not a second copy of it, and GEN-R-7 continues to hold unchanged. A per-tool
+document MAY describe what its pin means but SHALL NOT reproduce the value.
+
+| Source | Classification | Mechanism | Key |
+|---|---|---|---|
+| mise | orchestrator | top-level | `min_version` |
+| cmake | dev tool | `[tools]` | `cmake` |
+| go | dev tool | `[tools]` | `go` |
+| neovim | build input | `[env]` | `NVIM_VERSION` |
+| oh-my-zsh | runtime content | `[env]` | `OHMYZSH_REF` |
+| zsh-autosuggestions | runtime content | `[env]` | `AUTOSUGGEST_REF` |
+| cmakelib | runtime content | `[env]` | `CMLIB_REF` |
+| cmakelib-component-cmconf | runtime content | `[env]` | `CMLIB_CMCONF_REF` |
+| cmakelib-component-cmdef | runtime content | `[env]` | `CMLIB_CMDEF_REF` |
+| cmakelib-component-cmutil | runtime content | `[env]` | `CMLIB_CMUTIL_REF` |
+| cmakelib-component-storage | runtime content | `[env]` | `CMLIB_STORAGE_REF` |
+
 ### Verifiability
 
 **GEN-R-12** Every requirement SHALL be verifiable by an observable check. A
@@ -308,12 +408,40 @@ environment (GEN-A-7) is prepared. This is what allows verification to exercise
 one task at a time: the aggregate task pulls in the desktop applications, which
 are roughly 15 GB of downloads that no check needs.
 
-**GEN-R-16** The tool-install location variable SHALL be exported by exactly
-two places: the entry point, for the setup run itself, and the rendered
-login-shell profile, for every later interactive session (GEN-A-11). It SHALL
-NOT be set from the orchestrator's own configuration, which is read too late
-(GEN-A-7). Both exporters SHALL derive it from the application-directory
-setting rather than repeating a literal path (GEN-R-1b).
+**GEN-R-16** The application-directory setting, the orchestrator's data
+directory, and the orchestrator's installs directory SHALL each be exported by
+exactly two places: the entry point, for the setup run itself, and the
+rendered login-shell profile, for every later interactive session (GEN-A-11).
+The data directory and the installs directory SHALL NOT be set from the
+orchestrator's own configuration, which is read too late (GEN-A-7). Both
+exporters SHALL derive the data directory and the installs directory from the
+application-directory setting rather than repeating a literal path (GEN-R-1b).
+
+Because this file is also the orchestrator's global configuration (ZSH-R-15)
+and templates directly on the application-directory setting
+(`{{env.APP_DIR}}`, first used by GEN-A-13's `ORCHESTRATOR_BIN`), the setting
+is not merely something the orchestrator reads once running - it is a
+precondition for parsing this file at all. mise SHALL fail outright, before
+any task runs, when the application-directory setting is absent from the
+environment; this follows directly from naming this file the global
+configuration and templating on the setting, and it is not itself a fourth
+place that exports the setting. Every sanctioned entry point (`setup`, the
+rendered login profile, and the harness's `test/run.sh`) already exports the
+application-directory setting for the reasons stated above, and none of them
+may drop that export merely because a given invocation appears not to need
+the data or installs directories - the file cannot be read without it.
+
+`CLARIFIED 2026-08-19`: the paragraph above names three exporters where the
+normative sentence says exactly two, and the two statements are about
+different things. The normative count governs the delivered system: on a
+configured machine there are exactly two exporters, the entry point and the
+rendered login-shell profile, and a third would be the duplication the
+requirement forbids. `test/run.sh` is not a third: it runs only inside a
+throwaway container, where it reconstructs the same values the entry point
+exported in a child process that never reached the harness's own shell, and
+it derives them from the application-directory setting rather than restating
+literals. Verification reproducing the environment under test is not the
+system exporting it twice. The count stands as written.
 
 ### Destructive operations
 
@@ -330,6 +458,13 @@ well as recursive deletion: a forced checkout discards uncommitted work just as
 effectively. An existing clean clone already at the pinned ref SHALL be reused
 in place and SHALL NOT be re-fetched.
 
+`WEAKENED 2026-08-17`: the submodule refusal is implemented with a query that
+is meaningful only for paths inside the repository, so for fetched sources
+that now live in the application directory it cannot fire. The unregistered-
+content and uncommitted-changes refusals still apply to those paths. The
+requirement is not withdrawn; this records that one of its three guards does
+not cover the relocated sources.
+
 **GEN-R-17b** For deployment (GEN-D-11) this means the link step SHALL refuse a
 target in the user's home directory that exists and is not already a symbolic
 link resolving into this repository. An existing symbolic link that does
@@ -345,6 +480,78 @@ content SHALL be a pure function of the pins it represents, so that an
 unchanged pin reproduces byte-identical content and the gate still reports the
 build as fresh.
 
+### Elevation
+
+**GEN-R-19** Setup SHALL be split into a privileged phase and an unprivileged
+phase. The unprivileged phase SHALL invoke no elevation, and SHALL verify its
+system prerequisites before running any task that needs them, failing and
+naming every absent prerequisite when any is missing.
+
+### Tool versions
+
+**GEN-R-21** Setup SHALL leave exactly one installed version of each pinned
+tool. A superseded version is not reachable from any pin, and its presence
+makes resolution ambiguous where no configuration is in scope.
+
+`ACCEPTED 2026-08-19`: `MISE_INSTALLS_DIR` is exported into every interactive
+shell (GEN-R-16), so the application directory is a machine-wide shared
+install store, not one scoped to this repository. Pruning therefore scans
+that whole shared tree, not only the tools this repository pins. A version
+belonging to some other project's configuration is protected from removal
+solely by the orchestrator's own tracked-configs state: it survives only
+while some still-trusted configuration currently pins it. If that other
+project's checkout is deleted, moved, or untrusted, its pinned version stops
+being reachable from any trusted configuration and becomes prunable on the
+next routine setup run, not only when someone deliberately runs a global
+prune. This is accepted rather than overlooked: it follows directly from the
+shared-application-directory and global-configuration design settled by
+earlier requirements, and tracked-configs is precisely the mechanism meant to
+bound it - this requirement only wires that existing safety net to a more
+frequent trigger. A prune scoped to a hardcoded tool list was considered and
+rejected: it would duplicate what `[tools]` already declares.
+
+`NARROWED 2026-08-19`: the paragraph above describes the unscoped prune as it
+was first implemented and no longer describes what setup does. It is kept as
+the record of what was accepted and why, and is superseded from here down.
+
+The acceptance was wrong on its radius. mise enumerates the installs
+directory against its own core backends as `<tool>/<version>`, so with the
+installs directory set to the application directory the unscoped prune reaches
+every directory a user happens to keep at `<application directory>/<core tool
+name>/<version>/` - `python`, `node`, `ruby`, `java`, `bun`, `deno`, `zig` and
+the rest - not only versions some other project's configuration pins. Such a
+directory has no tracked configuration behind it, so tracked-configs is not a
+safety net for it at all: it is deleted on the first routine unprivileged
+setup run, with the confirm-everything flag suppressing the prompt.
+`VERIFIED - observed against mise 2026.8.6` in a scratch installs tree: an
+unscoped `prune --tools --dry-run` scheduled a hand-created `node/20.0.0` for
+removal, while `kubectl/1.30.0` and `MyNotes/2026` - neither a core backend
+name - were left alone.
+
+The prune is therefore scoped to the tools this repository pins, by name.
+The names are derived from the pin file's `[tools]` table at run time and not
+restated anywhere, so GEN-R-7 is untouched; deriving rather than hardcoding is
+what the rejection above was actually objecting to, and it is the same
+technique the entry point already uses for `min_version`. The unscoped form is
+refused outright when the derivation yields nothing, because no tool argument
+is what makes the run unbounded.
+
+The radius after this change is exactly what the normative sentence claims and
+no more: versions of the tools named in this repository's `[tools]` table, and
+of no other tool. Within that radius the earlier paragraph still holds - a
+version of a pinned tool that some other project's configuration also pins
+survives only while that configuration stays tracked and trusted, and
+tracked-configs is genuinely the mechanism bounding that case. Outside it,
+nothing is examined at all.
+
+This is what reconciles GEN-R-21 with GEN-R-17. Setup still deletes a path it
+did not itself create - a version of a pinned tool installed by some other
+mise configuration - and that is the accepted residue, bounded above and
+argued for by the ambiguity the normative sentence names. What it no longer
+does is delete paths that have nothing to do with any tool this repository
+manages, which is the case GEN-R-17 exists to refuse and which the fetch and
+link steps refuse by name.
+
 ---
 
 ## 5. Verification of the global requirements
@@ -356,7 +563,7 @@ build as fresh.
 | GEN-R-1b | Changing the setting and re-running relocates every artifact; the literal default path appears only in the setting's own definition |
 | GEN-R-1c | The application directory contains no templates, pins or documentation |
 | GEN-R-2 | Searching the repository for absolute home paths containing a literal username returns nothing |
-| GEN-R-3 | The ignore file covers the state, build and vendor directories; the application directory is outside the repository and untracked by construction |
+| GEN-R-3 | The ignore file covers the state and build directories; the application directory is outside the repository and untracked by construction; the one recorded exception (the autosuggestions plugin) is covered by its own ignore entry |
 | GEN-R-3a | Deleting the application directory and re-running setup restores a working environment |
 | GEN-R-4 | Two consecutive setup runs; the second reports no work and exits zero |
 | GEN-R-5 | The orchestrator can print a dependency graph |
@@ -367,10 +574,15 @@ build as fresh.
 | GEN-R-10 | Preview mode runs and changes nothing |
 | GEN-R-13 | Every managed tool has a matching document in this directory |
 | GEN-R-15 | The entry point given a task name runs that task and its declared predecessors only; given no argument it runs `all` |
-| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory under the application directory; the orchestrator's configuration contains no assignment of that variable |
+| GEN-R-16 | Starting an interactive shell with an empty environment and no prior setup run leaves the orchestrator reporting its data directory and its installs directory both under the application directory; the orchestrator's configuration contains no assignment of either variable; running the orchestrator with the application-directory setting unset fails config parsing outright rather than silently defaulting |
+| GEN-A-13 | Every task body that invokes the orchestrator does so through `"$ORCHESTRATOR_BIN"`, never through a bare `mise`; searching the task table for a bare invocation returns nothing |
 | GEN-R-17a | With a registered submodule at a fetch path, and separately with an uncommitted change in a fetched work tree, the fetch step exits non-zero, names the path, and the path's contents are unchanged |
 | GEN-R-17b | With a real file at a deployment target, the link step exits non-zero, names the path, and the file's contents survive; with the correct symbolic link already in place it exits zero and changes nothing |
 | GEN-R-18 | Changing a pin and re-running rebuilds; re-running with the pin unchanged reports the build as up to date and skips it |
+| GEN-R-19 | Each unprivileged task (preflight, tools, fetch, render, link, flathub, preview) completes in an image where sudo is not installed; proven piecewise, not as one `all` run, because `all` is the ~15 GB application-download path |
+| GEN-D-16 | Every key named in the registry table resolves in the pin file |
+| GEN-R-20 | Searching the requirements directory for any pin-file value other than `min_version` returns nothing; `min_version` is excluded because its only appearances are dated observations ("VERIFIED - observed against mise <version>") naming the release a finding was made against, not restatements of the pin |
+| GEN-R-21 | After a setup run, exactly one full-version directory exists beneath each pinned tool's own directory, and the tool reports the pinned version; the prune step names the tools it may remove and refuses to run when it can name none; a directory shaped like an install of a core tool this repository does not pin survives a second run of the tools task. The pin-bump wording of the requirement is not itself exercised - the harness installs from scratch and never bumps a pin - so removal of a superseded version rests on the dated observation recorded above rather than on an automated check |
 
 ---
 

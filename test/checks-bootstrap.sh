@@ -12,3 +12,17 @@ assert_cmd  "mise is at the pinned version" bash -c '
 assert_cmd  "mise finds repo config"       bash -c 'cd /home/tester/work && mise config ls | grep -q mise.toml'
 assert_cmd  "preview mode runs"            bash -c 'cd /home/tester/work && mise run preview'
 assert_cmd  "cmakelib env exported"        bash -c 'cd /home/tester/work && mise env | grep -q CMLIB_DIR'
+assert_cmd  "preview-system mode runs"     bash -c 'cd /home/tester/work && mise run preview-system'
+# grep -A5 would stay inside [tasks.preview]'s body only by coincidence of its
+# current length; a shorter body would let the window bleed into
+# [tasks.preview-system]'s own dnf line and fail for the wrong reason. awk
+# extracts exactly the block between the two [tasks.*] headers instead.
+assert_cmd  "preview names no dnf"         bash -c '
+    ! awk "/^\[tasks\.preview\]\$/{f=1;next} /^\[/{f=0} f" \
+        /home/tester/work/mise.toml | grep -q "manager dnf"'
+assert_cmd "the orchestrator lives in its own directory" bash -c '
+    [ -x "${APP_DIR}/mise/bin/mise" ]
+'
+assert_cmd "no bare bin directory under APP_DIR" bash -c '
+    [ ! -e "${APP_DIR}/bin" ]
+'

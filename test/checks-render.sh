@@ -34,6 +34,12 @@ assert_cmd "MISE_DATA_DIR exported before mise is activated" bash -c '
     d=$(grep -n "^export MISE_DATA_DIR=" zsh/zshrc | head -1 | cut -d: -f1)
     a=$(grep -n "mise activate zsh"      zsh/zshrc | head -1 | cut -d: -f1)
     [[ -n $d && -n $a && $d -lt $a ]]'
+# Same shape, same reason (GEN-A-7): MISE_INSTALLS_DIR is read at process
+# start too, so it must be exported above activation as well.
+assert_cmd "MISE_INSTALLS_DIR exported before mise is activated" bash -c '
+    d=$(grep -n "^export MISE_INSTALLS_DIR=" zsh/zshrc | head -1 | cut -d: -f1)
+    a=$(grep -n "mise activate zsh"           zsh/zshrc | head -1 | cut -d: -f1)
+    [[ -n $d && -n $a && $d -lt $a ]]'
 
 # Step 4a: the cmakelib exports moved to mise.toml [env], so neither the
 # fragment nor its rendered output may come back.
@@ -54,3 +60,48 @@ assert_cmd "theme committed"   test -f zsh/custom/themes/muse.zsh-theme
 assert_cmd "patch file gone"   test ! -f zsh/muse_theme.patch
 assert_cmd "theme prompt is two lines" \
     bash -c '[[ $(sed -n 2p zsh/custom/themes/muse.zsh-theme) == *"FG[077]"* ]]'
+
+assert_cmd "global config file exported before activation" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_FILE=" zsh/zshrc &&
+    [ "$(grep -n "^export MISE_GLOBAL_CONFIG_FILE=" zsh/zshrc | cut -d: -f1)" \
+      -lt "$(grep -n "mise activate zsh" zsh/zshrc | cut -d: -f1)" ]
+'
+assert_cmd "global config file points at the pin registry" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_FILE=\"$PWD/mise.toml\"" zsh/zshrc
+'
+assert_cmd "no unsubstituted placeholder" bash -c '! grep -q "___" zsh/zshrc'
+
+# GEN-R-1a / Task 9's acceptance assertion: THIS REPOSITORY's own search-path
+# export - not the tool directories mise injects at activation, which legitimately
+# multiply now that MISE_INSTALLS_DIR is the application directory - must
+# name exactly two application-directory entries: mise's own bin (needed
+# before activation can run at all) and nvim's (built from source, never
+# resolved as a mise tool). Parsed out of the rendered export rather than a
+# runtime $PATH, because this is the one place in the repository that claim
+# is actually made.
+assert_cmd "the repository's own PATH export names exactly two APP_DIR entries" bash -c '
+    line=$(grep -F "export PATH=\"\$APP_DIR" zsh/zshrc)
+    [[ -n $line ]] || exit 1
+    value=${line#export PATH=\"}
+    value=${value%\"}
+    [[ $(tr ":" "\n" <<< "$value" | grep -c "^\$APP_DIR/") -eq 2 ]] &&
+    grep -qF "\$APP_DIR/mise/bin" <<< "$value" &&
+    grep -qF "\$APP_DIR/nvim/bin" <<< "$value"
+'
+
+# ZSH-R-13 in full. The three checks above each compare one export against the
+# activation line; the requirement also fixes the order of the five relative to
+# one another, and APP_DIR and the search path had no position check at all.
+# One comparison chain covers all of it, so deleting any of the five (an empty
+# line number fails the -n test) or moving one out of sequence fails here.
+assert_cmd "the five exports appear in the declared order above activation" bash -c '
+    n() { grep -n "$1" zsh/zshrc | head -1 | cut -d: -f1; }
+    a=$(n "^export APP_DIR=")
+    d=$(n "^export MISE_DATA_DIR=")
+    i=$(n "^export MISE_INSTALLS_DIR=")
+    p=$(n "^export PATH=\"\$APP_DIR")
+    g=$(n "^export MISE_GLOBAL_CONFIG_FILE=")
+    act=$(n "mise activate zsh")
+    [[ -n $a && -n $d && -n $i && -n $p && -n $g && -n $act ]] || exit 1
+    [[ $a -lt $d && $d -lt $i && $i -lt $p && $p -lt $g && $g -lt $act ]]
+'

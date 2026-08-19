@@ -23,8 +23,8 @@ Mixed, and the parts are deliberately separated:
 
 | Source | Pin | Recorded as |
 |---|---|---|
-| Oh My Zsh | `b54a7197` | commit SHA - there is no tag |
-| Autosuggestions | `c3d4e57` (`v0.7.0-12-g...`) | commit SHA |
+| Oh My Zsh | recorded in the pin registry (GEN-D-16) under key `OHMYZSH_REF` | commit SHA - there is no tag |
+| Autosuggestions | recorded in the pin registry (GEN-D-16) under key `AUTOSUGGEST_REF` | commit SHA |
 
 **ZSH-R-1** Both SHALL be fetched over HTTPS anonymously (GEN-A-4) and pinned by
 SHA. Neither may track a branch.
@@ -37,11 +37,15 @@ the plugin failing to load from any other location.
 
 **ZSH-R-12** The autosuggestions plugin SHALL therefore be fetched directly to
 `zsh/custom/plugins/zsh-autosuggestions`, its real load path, and SHALL NOT be
-placed under `vendor/` with a symbolic link pointing at it. This is a
+placed under `_vendor/` with a symbolic link pointing at it. This is a
 correction to an earlier formulation that grouped it with the other fetched
-runtime content under `vendor/`; the intent of that formulation - fetched
+runtime content under `_vendor/`; the intent of that formulation - fetched
 runtime content lives inside the repository and is never committed - is
 unchanged, and the path is ignored by git like the rest of it.
+
+As of 2026-08-17 this path is the single stated exception to GEN-R-3 rather
+than an instance of its general case: every other fetched source now lives in
+the application directory.
 
 ## 4. Oh My Zsh constraints
 
@@ -122,6 +126,9 @@ for elevation every run even when nothing changes. This is a known cost, not a
 defect in the requirement: the apply itself is a no-op the second time.
 `VERIFIED` - observed in two consecutive harness runs.
 
+The elevation is confined to the privileged phase (GEN-R-19), so this cost
+applies to `./setup system` only and not to the default `./setup`.
+
 ## 8. Rendered configuration
 
 **ZSH-R-7** One file is rendered and deployed: the shell configuration itself.
@@ -134,16 +141,18 @@ cmakelib owns them (CMLIB-R-3) empties the fragment completely, so it is
 deleted rather than ported.
 
 **ZSH-R-8** Placeholders substituted at render time SHALL be limited to values
-genuinely unknown until setup runs. Two remain in this tool: the framework path
-and the custom directory (ZSH-R-14). The CMake library path leaves with the
-fragment (ZSH-A-6), and two path fragments are removed outright (ZSH-R-10,
-ZSH-R-11).
+genuinely unknown until setup runs. Three remain in this tool: the framework
+path, the custom directory (ZSH-R-14) and the global configuration file
+(ZSH-R-15). The CMake library path leaves with the fragment (ZSH-A-6), and two
+path fragments are removed outright (ZSH-R-10, ZSH-R-11).
 
 **ZSH-R-14** The custom directory SHALL have its own placeholder,
-`___ZSH_CUSTOM_DIR___`, distinct from the framework-path placeholder. The two
-name unrelated roots - the framework is fetched runtime content outside the
-committed tree, while the custom directory is committed repository content -
-and a single placeholder cannot yield both.
+`___ZSH_CUSTOM_DIR___`, distinct from the framework-path placeholder and from
+the global configuration file placeholder (ZSH-R-15). The three name unrelated
+values - the framework is fetched runtime content outside the committed tree,
+the custom directory is committed repository content, and the configuration
+file is this repository's own `mise.toml`, reached by a second route - and a
+single placeholder cannot yield all three.
 
 **ZSH-R-9** The configuration SHALL NOT export another tool's settings
 (GEN-R-9). The CMake library's environment currently originates here; it SHALL
@@ -158,19 +167,30 @@ artifact at once.
 Haskell environment line SHALL be deleted outright - see the Go document and
 GEN-R-2.
 
-**ZSH-R-13** The rendered configuration SHALL export the application directory,
-the orchestrator's data directory and the search path **before** activating the
-orchestrator, in that order. The data directory is read at process start
-(GEN-A-7, GEN-A-11), so activation that happens first uses the orchestrator's
-default location and every tool an interactive shell installs from then on
-lands outside the application directory, breaking GEN-R-1a. The rendered
-profile is therefore the second legitimate exporter of that variable beside the
-entry point (GEN-R-16), not a duplication of it.
+**ZSH-R-13** The rendered configuration SHALL export the application
+directory, the orchestrator's data directory, the orchestrator's installs
+directory, the search path and the global configuration file (ZSH-R-15)
+**before** activating the orchestrator, in that order. The data directory and
+the installs directory are read at process start (GEN-A-7, GEN-A-11), so
+activation that happens first uses the orchestrator's default locations and
+every tool an interactive shell installs from then on lands outside the
+application directory, breaking GEN-R-1a. The rendered profile is therefore
+the second legitimate exporter of those variables beside the entry point
+(GEN-R-16), not a duplication of it.
 
 **ZSH-R-13a** Activation SHALL be guarded on the orchestrator's existence
 (GEN-R-8b). Before the first setup run the orchestrator is absent, and an
 unguarded activation reports an error on every shell start - on precisely the
 fresh machine this repository exists to configure.
+
+**ZSH-R-15** The rendered configuration SHALL name this repository's
+configuration file as the orchestrator's global configuration. Activation
+alone is insufficient: it resolves tools by walking upward from the working
+directory (GEN-A-6), so it exposes them only beneath this repository, while
+the fragments it replaced (ZSH-R-10, ZSH-R-11) were unconditional and
+therefore machine-wide. The variable is read before configuration is parsed
+and SHALL therefore be exported above the activation line and SHALL NOT be
+set from `[env]`.
 
 ## 9. Verification
 
@@ -184,7 +204,8 @@ fresh machine this repository exists to configure.
 | ZSH-R-9 | The CMake library environment is traceable to that tool's document |
 | ZSH-R-11 | No path in the rendered configuration references a missing directory |
 | ZSH-R-12 | The plugin loads in an interactive shell, and no symbolic link stands in for it |
-| ZSH-R-13 | In the rendered file the three exports appear above the activation line; deleting any one of them, or moving it below the activation, fails the check |
+| ZSH-R-13 | In the rendered file the five exports appear above the activation line; deleting any one of them, or moving it below the activation, fails the check |
 | ZSH-R-13a | A shell started on a machine with no orchestrator prints nothing and exits zero; on a configured machine activation still takes effect |
 | ZSH-R-14 | The rendered file contains no unsubstituted placeholder, and the framework path and the custom directory resolve to different roots |
+| ZSH-R-15 | An interactive shell started outside this repository resolves every pinned tool by name and reports the pinned version, and resolves `cmake` to the pinned version rather than the system one |
 | ZSH-A-8 | After setup the login shell is the absolute path to Zsh, and a second run reports it as already set |

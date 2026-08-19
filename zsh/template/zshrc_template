@@ -138,14 +138,22 @@ setopt EXTENDED_HISTORY
 setopt hist_ignore_all_dups
 
 # Tool visibility comes from mise activation, which covers every installed
-# artifact at once. mise reads MISE_DATA_DIR at process start, so it cannot be
-# supplied by mise.toml's [env]: an interactive shell that fails to export it
-# here installs outside the application directory. ./setup exports the same
-# pair for its own process; a login shell is the second place that legitimately
-# needs them.
+# artifact at once. mise reads MISE_DATA_DIR and MISE_INSTALLS_DIR at process
+# start, so neither can be supplied by mise.toml's [env]: an interactive shell
+# that fails to export them here installs outside the application directory.
+# ./setup exports the same set for its own process; a login shell is the
+# second place that legitimately needs them.
 export APP_DIR="${APP_DIR:-$HOME/App}"
 export MISE_DATA_DIR="$APP_DIR/mise"
-export PATH="$APP_DIR/bin:$PATH"
+export MISE_INSTALLS_DIR="$APP_DIR"
+export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$PATH"
+# Activation resolves tools by walking up from $PWD, so on its own it exposes
+# them only beneath this repository - narrower than the unconditional path
+# fragments it replaced (ZSH-R-10, ZSH-R-11). Naming this repository's
+# configuration as the global one restores machine-wide resolution without a
+# second pin: it is the same file, reached by a second route. Read before the
+# configuration is parsed, so it cannot come from [env].
+export MISE_GLOBAL_CONFIG_FILE="___MISE_CONFIG_FILE___"
 # Guarded the same way setup and the harness guard theirs: on a machine where
 # ./setup has not run yet, mise is absent and every shell start would otherwise
 # report it.

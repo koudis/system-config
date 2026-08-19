@@ -1,0 +1,39 @@
+FROM registry.fedoraproject.org/fedora:44
+
+# The account is created before anything is installed, deliberately. useradd
+# copies /etc/skel into the new home, and Fedora's zsh package installs
+# /etc/skel/.zshrc and /etc/skel/.zprofile. On a real machine the account long
+# predates './setup system', so those files are never copied into it; an image
+# that installed zsh first would hand the link task a real ~/.zshrc, which it
+# would correctly refuse to replace (GEN-R-17b), and would be testing a
+# situation no user is ever in.
+RUN useradd -m tester
+
+# The unprivileged phase's prerequisites, baked in: this image stands for a
+# machine on which './setup system' has already run, which is what isolates
+# "the unprivileged phase needs no elevation" from "the privileged phase
+# installs the right things" - the latter is what test/Containerfile covers.
+# sudo is deliberately absent, so any elevation left in the unprivileged phase
+# fails the run rather than passing silently (GEN-R-19).
+# zsh is here for the same reason as the rest: the privileged phase declares it
+# in [bootstrap.packages], so a machine that has run './setup system' has it.
+# It is not a preflight prerequisite (preflight gates only what the unprivileged
+# tasks execute, and no task runs zsh), but the rendered login profile is the
+# only place MISE_GLOBAL_CONFIG_FILE is exported, and without a zsh here the
+# machine-wide-resolution claim that ZSH-R-15, GO-R-2 and spec section 6 all
+# rest on cannot be checked at all - only that the export is rendered in the
+# right position, which test/checks-render.sh already covers.
+RUN dnf -y install git curl gcc make ninja-build gettext glibc-gconv-extra flatpak zsh \
+    && dnf clean all
+
+# Fedora's base image ships sudo, so omitting it from the install list is not
+# enough - it has to be removed. sudo is a protected package, hence the
+# override. The assertion is not decoration: if a future base image or a
+# dependency pulls sudo back in, this image would silently stop testing the
+# property it exists to test, and every unprivileged run would pass for the
+# wrong reason.
+RUN dnf -y remove sudo --setopt=protected_packages= && dnf clean all
+RUN ! command -v sudo
+
+USER tester
+WORKDIR /home/tester/repo

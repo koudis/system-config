@@ -24,12 +24,51 @@ CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
 # cmakelib's own outputs (CMLIB-R-2), declared here rather than emitted from
 # the shell template. This is what removes the hidden coupling flagged by
 # GEN-R-9, ZSH-R-9 and CMLIB-R-3.
-CMLIB_DIR                       = "{{config_root}}/vendor/cmakelib"
-CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{config_root}}/vendor/"
+#
+# The config_root template value is prohibited in this file: this file is
+# also loaded as the machine-global mise configuration, where config_root
+# defaults to $HOME rather than the repository. Upstream's
+# MISE_GLOBAL_CONFIG_ROOT could change that default, but is deliberately not
+# used here - the paths this configuration needs live under the application
+# directory, and {{env.APP_DIR}} addresses them correctly by either route.
+CMLIB_DIR                       = "{{env.APP_DIR}}/cmakelib/cmakelib"
+CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{env.APP_DIR}}/cmakelib/"
+
+# The seventeen desktop applications (APPS-R-11: they live here and nowhere
+# else, so GEN-R-7 still holds now that they are no longer in
+# [bootstrap.packages]). Read by [tasks.apps] and by [tasks.preview].
+FLATPAK_APPS = """
+org.kicad.KiCad org.freecad.FreeCAD net.ankiweb.Anki md.obsidian.Obsidian
+com.prusa3d.PrusaSlicer com.jgraph.drawio.desktop com.usebottles.bottles
+org.texstudio.TeXstudio org.onlyoffice.desktopeditors org.openstreetmap.josm
+com.axosoft.GitKraken org.kde.krita com.github.tchx84.Flatseal
+org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2
+org.kde.tellico
+"""
+
+# The orchestrator's own binary, named here rather than left to bare `mise`
+# lookups in task bodies (GEN-A-13): mise strips every inherited PATH entry
+# under the installs directory before handing a task its shell, and that
+# directory is now the application root, so wherever the orchestrator itself
+# is installed falls inside what gets stripped. Deliberately not
+# MISE_-prefixed, so it cannot collide with a future upstream setting. This is
+# an ordinary derived value consumed only by task bodies, not one mise reads
+# at process start (GEN-A-7), so [env] is where it belongs - it is not the
+# process-start prohibition GEN-R-16 covers. Its value names the binary's
+# current home, App/mise/bin/mise; mise already owns App/mise for its own
+# cache and state, so the binary lives alongside it rather than in a shared
+# App/bin.
+# This is also the first {{env.APP_DIR}} template in this file (GEN-R-16):
+# because this file is the orchestrator's global configuration, APP_DIR is
+# now required to parse it at all, from any process, not only from setup or
+# the rendered profile - a bare `mise` command with APP_DIR unset fails on
+# config parse before running anything. That is accepted deliberately, not a
+# bug: see GEN-R-16.
+ORCHESTRATOR_BIN = "{{env.APP_DIR}}/mise/bin/mise"
 
 [tools]
 cmake = "3.30.1"
-go    = "1.23.3"
+go    = "1.26.6"
 
 # [system.packages] does not exist in this mise version (GEN-A-8); the
 # installed release (2026.8.6) shipped the same subsystem under
@@ -55,70 +94,167 @@ login_shell = "/usr/bin/zsh"
 "dnf:git"                 = "latest"
 "dnf:flatpak"             = "latest"
 
-# flatpak entries in the same table (R6: mise forbids a second
-# [bootstrap.packages] header). "flatpak" (not "flatpak-user") is system
-# scope (APPS-R-6). "latest" is mandatory - the manager rejects version
-# pins (APPS-A-1).
-"flatpak:org.kicad.KiCad"                  = "latest"
-"flatpak:org.freecad.FreeCAD"              = "latest"
-"flatpak:net.ankiweb.Anki"                 = "latest"
-"flatpak:md.obsidian.Obsidian"             = "latest"
-"flatpak:com.prusa3d.PrusaSlicer"          = "latest"
-"flatpak:com.jgraph.drawio.desktop"        = "latest"
-"flatpak:com.usebottles.bottles"           = "latest"
-"flatpak:org.texstudio.TeXstudio"          = "latest"
-"flatpak:org.onlyoffice.desktopeditors"    = "latest"
-"flatpak:org.openstreetmap.josm"           = "latest"
-"flatpak:com.axosoft.GitKraken"            = "latest"
-"flatpak:org.kde.krita"                    = "latest"
-"flatpak:com.github.tchx84.Flatseal"       = "latest"
-"flatpak:org.gnome.Extensions"             = "latest"
-"flatpak:com.mattjakeman.ExtensionManager" = "latest"
-"flatpak:cc.arduino.IDE2"                  = "latest"
-"flatpak:org.kde.tellico"                  = "latest"
-
-# --manager dnf keeps this scoped: the apps task below applies the flatpak
-# entries from the same [bootstrap.packages] table, and those must not
-# install before the Flathub remote exists.
-# chsh authenticates the target user via PAM, which blocks on a password
-# prompt for a non-root caller; running it via sudo skips that prompt. sudo's
-# secure_path drops $APP_DIR/bin, so PATH must be forwarded explicitly.
+# --manager dnf is not required for correctness now that this table holds
+# only dnf: entries (the flatpak: entries moved to FLATPAK_APPS and
+# [tasks.apps]). It stays because it states the scope at the call site.
+# Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13): task bodies
+# lose any inherited PATH entry under the installs directory, which now
+# includes wherever the orchestrator itself is installed.
 [tasks.packages]
-run = """
-mise bootstrap packages apply --yes --manager dnf
-sudo env "PATH=$PATH" mise bootstrap user apply --yes
-"""
+run = '"$ORCHESTRATOR_BIN" bootstrap packages apply --yes --manager dnf'
+
+# chsh authenticates the target user via PAM, which blocks on a password
+# prompt for a non-root caller; running it via sudo skips that prompt. sudo
+# clears the environment by default, forwarding neither variable on its own.
+# Invoked through ORCHESTRATOR_BIN, not bare `mise` (GEN-A-13); expanded in
+# this shell before sudo runs, so locating the orchestrator itself no longer
+# needs PATH forwarded - but the elevated process is a fresh `mise` that
+# re-parses this file from scratch, and ORCHESTRATOR_BIN's own template
+# (`{{env.APP_DIR}}`) fails to resolve unless APP_DIR is forwarded too:
+# without it mise errors "Field `APP_DIR` is not defined" before the task
+# body ever runs. PATH stays forwarded as well - secure_path would otherwise
+# drop $APP_DIR/mise/bin from what `mise bootstrap user apply` sees while
+# running, and nothing here proves that step never shells out to a bare tool
+# name that needs it.
+# This is the only literal sudo in this file (GEN-R-19); mise elevates on its
+# own for the dnf apply above.
+# depends = ["packages"]: mise runs independent dependencies of [tasks.system]
+# in parallel, and chsh here targets /usr/bin/zsh, which only exists once the
+# dnf apply in packages has installed it. Without this, the two tasks race.
+[tasks.login-shell]
+depends = ["packages"]
+run = 'sudo env "PATH=$PATH" "APP_DIR=$APP_DIR" "$ORCHESTRATOR_BIN" bootstrap user apply --yes'
+
+# The privileged phase. Everything reachable from here may elevate; nothing
+# outside it may (GEN-R-19).
+[tasks.system]
+depends = ["packages", "login-shell"]
 
 # mise does not create flatpak remotes (APPS-A-5), so this is an explicit
-# preceding step. Adding the remote manually (rather than via Fedora's
-# flatpak-remote package) is what removes Fedora's default filter
-# (APPS-A-7). --if-not-exists makes it idempotent (APPS-R-8).
+# preceding step (APPS-R-7). Adding the remote manually, rather than via
+# Fedora's flatpak-remote package, is what removes Fedora's default filter
+# (APPS-A-7). --if-not-exists makes it idempotent (APPS-R-8), and --user is
+# what removes the elevation: a system remote is not visible to a --user
+# install, so the remote and the installs must share a scope.
 [tasks.flathub]
-depends = ["packages"]
+depends = ["preflight"]
 run = """
-sudo flatpak remote-add --if-not-exists flathub \
+flatpak remote-add --user --if-not-exists flathub \
   https://dl.flathub.org/repo/flathub.flatpakrepo
 """
 
+# --or-update is load-bearing: a plain install on an application that is
+# already present warns and exits non-zero, which would fail the second-run
+# requirement (GEN-R-4). --or-update makes that case a silent no-op update.
+# flatpak's own progress output is the one place this repository emits status;
+# suppressing it during a multi-gigabyte download would be worse than the noise.
 [tasks.apps]
 depends = ["flathub"]
-run = "mise bootstrap packages apply --yes --manager flatpak"
+run = """
+set -euo pipefail
+for app in $FLATPAK_APPS; do
+    flatpak install --user --noninteractive --or-update flathub "$app"
+done
+"""
 
-# Decorative by mise's design, kept deliberately: mise installs everything in
-# [tools] before it runs any task at all, so `mise install` here has nothing
-# left to do and depends = ["packages"] gates nothing - `./setup fetch` on a
-# fresh box downloads both SDKs on the way to fetching. Removing the task would
-# leave no way to ask for the SDK step alone, which is what [tasks.all] and the
-# harness (`test/run.sh tools tools`) name, so it stays as that entry point.
+# The unprivileged phase's system prerequisites. Blocking here rather than
+# letting the Neovim build fail on a missing compiler is the same
+# refuse-and-name-the-path answer the fetch, render and link guards give: the
+# message is the only thing that tells the user the privileged phase was never
+# run. Silent on success.
+#
+# The list gates what the tasks execute and nothing else. git and curl are used
+# by setup, fetch and the Neovim download; gcc, make, ninja and msgfmt by the
+# Neovim build; flatpak by flathub and apps. glibc-gconv-extra ships no binary
+# and cannot be command-checked, so it stays asserted by rpm -q in the
+# privileged phase's checks and otherwise surfaces during the build.
+# mise templates run scripts with Tera before handing them to the shell, so
+# the usual ${#missing[@]} length check is unusable here: the literal `{#`
+# reads as an unclosed Tera comment opener and fails task validation before
+# bash ever sees the script. An emptiness test on ${missing[*]-} sidesteps it.
+[tasks.preflight]
+run = """
+set -euo pipefail
+missing=()
+for c in git curl gcc make ninja msgfmt flatpak; do
+    command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+done
+if [[ -n "${missing[*]-}" ]]; then
+    echo "preflight: missing required commands: ${missing[*]}" >&2
+    echo "preflight: these come from the privileged half" >&2
+    echo "preflight: run './setup system' first, or install them yourself" >&2
+    exit 1
+fi
+"""
+
+# The `mise install` line is decorative by mise's design, kept deliberately:
+# mise installs everything in [tools] before it runs any task at all, so this
+# line has nothing left to do and depends = ["preflight"] gates nothing -
+# `./setup fetch` on a fresh box downloads both SDKs on the way to fetching.
+# Removing the task would leave no way to ask for the SDK step alone, which is
+# what [tasks.all] and the harness (`test/run.sh tools tools unprivileged`)
+# name, so it stays as that entry point. Invoked through ORCHESTRATOR_BIN, not
+# bare `mise` (GEN-A-13): the installs directory is now the application root,
+# and mise strips any inherited PATH entry beneath it - including wherever the
+# orchestrator's own binary lives - before handing this task its shell.
+#
+# GEN-R-21: leaves exactly one installed version of each pinned tool. A
+# superseded version is not reachable from any pin, and keeping it makes
+# resolution ambiguous where no configuration is in scope.
+#
+# Verified empirically against upstream source and the real binary: bare
+# `mise prune` only removes tracked configuration links here - it hits a
+# per-version confirmation prompt (src/cli/prune.rs) and, unanswered in a
+# non-interactive shell, silently skips the tool-deletion step, leaving a
+# stale install in place. `--dry-run` bypasses that same prompt, which is why
+# it reports a removal that the real run never performs. `--tools` (one of
+# prune's own flags, alongside --dry-run, --configs, --dry-run-code and
+# --monorepo) scopes the run to unused tool versions; `MISE_YES=1` is the
+# global confirm-everything flag (not a `prune` flag, so it cannot go after
+# the subcommand) that answers the prompt instead of a human. Together they
+# remove the stale version without a prompt. `mise uninstall` was rejected:
+# it requires naming the version to remove, which would restate a pin outside
+# the single pin location (GEN-R-7).
+#
+# The prune names the tools it may touch. Unscoped, `prune --tools` is
+# unbounded: MISE_INSTALLS_DIR is the application directory, so mise reads
+# every <name>/<version> directory beneath it as an install of one of its core
+# backends and schedules for deletion any version no trusted configuration
+# pins - including a directory the user created and this repository has never
+# written to. Observed against 2026.8.6 in a scratch installs tree: a
+# hand-kept `node/20.0.0` was scheduled for removal, with MISE_YES=1 answering
+# the confirmation that would otherwise have stopped it. That is the deletion
+# GEN-R-17 forbids. Naming the pinned tools bounds the run to what GEN-R-21
+# actually claims.
+#
+# The names are derived from [tools] rather than restated, the same way
+# ./setup derives min_version and test/checks-bootstrap.sh derives the pin it
+# asserts (GEN-R-7). The empty-result guard is load-bearing rather than
+# defensive noise: no tool arguments is the unbounded form, so a [tools] table
+# that cannot be read has to stop the task instead of falling back to it.
+# awk's index() and a bracket-free grep, because a TOML basic string treats a
+# backslash as an escape and a sed address for `[tools]` needs two of them.
 [tasks.tools]
-depends = ["packages"]
-run = "mise install"
+depends = ["preflight"]
+run = """
+set -euo pipefail
+"$ORCHESTRATOR_BIN" install
+root="$(git rev-parse --show-toplevel)"
+pinned=$(awk 'index($0,"[tools]")==1 {f=1; next} index($0,"[")==1 {f=0} f' "$root/mise.toml" \
+         | grep -E '^[A-Za-z]' | cut -d= -f1 | tr -d '[:blank:]' || true)
+if [[ -z $pinned ]]; then
+    echo "tools: no [tools] entries found in $root/mise.toml" >&2
+    echo "tools: refusing an unscoped prune of ${MISE_INSTALLS_DIR-}" >&2
+    exit 1
+fi
+MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools $pinned
+"""
 
 [tasks.fetch]
 run = """
 set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
-mkdir -p vendor zsh/custom/plugins
+mkdir -p "$APP_DIR/cmakelib" zsh/custom/plugins
 
 # R25: never destroy a directory this task did not create. A registered
 # submodule gitlink, or any uncommitted local changes, stop the task with a
@@ -183,15 +319,16 @@ fetch_pinned() {
     fi
 }
 
-fetch_pinned vendor/ohmyzsh https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH_REF"
+fetch_pinned "$APP_DIR/ohmyzsh" https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH_REF"
 # Oh My Zsh resolves custom plugins only under $ZSH_CUSTOM/plugins/, so this
-# clones to its real load path rather than vendor/ plus a symlink (R9).
+# clones to its real load path (ZSH-A-7, ZSH-R-12). It is the one fetched
+# source that stays inside the repository.
 fetch_pinned zsh/custom/plugins/zsh-autosuggestions https://github.com/zsh-users/zsh-autosuggestions.git "$AUTOSUGGEST_REF"
-fetch_pinned vendor/cmakelib https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
-fetch_pinned vendor/cmakelib-component-cmconf  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
-fetch_pinned vendor/cmakelib-component-cmdef   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
-fetch_pinned vendor/cmakelib-component-cmutil  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
-fetch_pinned vendor/cmakelib-component-storage https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib" https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmconf"  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmdef"   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmutil"  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
+fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-storage" https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
 """
 
 # A task gated by its own sources/outputs cannot be the one writing its
@@ -216,9 +353,9 @@ printf '%s\n%s\n' "$NVIM_VERSION" "$APP_DIR" > .build/nvim.version
 # templated with {{env.APP_DIR}}, so a new prefix names a path that does not
 # exist yet, which mise treats as not-fresh regardless of the stamp.
 [tasks.nvim]
-depends = ["tools", "packages", "nvim-stamp"]
+depends = ["tools", "preflight", "nvim-stamp"]
 sources = [".build/nvim.version"]
-outputs = ["{{env.APP_DIR}}/bin/nvim"]
+outputs = ["{{env.APP_DIR}}/nvim/bin/nvim"]
 run = """
 set -euo pipefail
 src=".build/neovim-${NVIM_VERSION}"
@@ -234,9 +371,9 @@ cd "$src"
 # [tools]-declared cmake on PATH for task execution, so command -v resolves
 # to the pinned mise-managed cmake rather than any system copy.
 make CMAKE_BUILD_TYPE=RelWithDebInfo \
-     CMAKE_INSTALL_PREFIX="$APP_DIR" \
+     CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" \
      CMAKE_PRG="$(command -v cmake)"
-make CMAKE_INSTALL_PREFIX="$APP_DIR" install
+make CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" install
 """
 
 # No sources/outputs (R12): mise has open upstream bugs where freshness
@@ -270,9 +407,10 @@ trap 'rm -f zsh/zshrc.mise-new vim/init.vim.mise-new' EXIT
 
 render() {
     local template="$1" out="$2" new="$2.mise-new"
-    sed -e "s|___OHMYZSH_PROJECT_DIR___|${root}/vendor|g" \
+    sed -e "s|___OHMYZSH_PROJECT_DIR___|${APP_DIR}|g" \
         -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
         -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
+        -e "s|___MISE_CONFIG_FILE___|${root}/mise.toml|g" \
         "$template" > "$new"
     # sha256sum, not cmp: cmp ships in diffutils, which a minimal Fedora
     # install does not have, and a comparison that errors out would refuse
@@ -329,12 +467,32 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["packages", "apps", "tools", "fetch", "nvim", "render", "link"]
+depends = ["preflight", "apps", "tools", "fetch", "nvim", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.
+# Split along the same seam as the phases: this one must stay runnable where
+# sudo does not exist, which is where checks-bootstrap.sh now exercises it.
+# The application half is hand-rolled because driving flatpak directly costs
+# the --dry-run the declarative table would have provided; it reads the same
+# FLATPAK_APPS list the install step reads.
+# The nested `mise run --dry-run all` is invoked through ORCHESTRATOR_BIN, not
+# bare `mise` (GEN-A-13): it runs inside this task's own shell, which has
+# already lost any inherited PATH entry under the installs directory.
 [tasks.preview]
 run = """
-mise run --dry-run all
-mise bootstrap packages apply --dry-run --manager dnf
+set -euo pipefail
+"$ORCHESTRATOR_BIN" run --dry-run all
+installed=$(flatpak list --user --columns=application 2>/dev/null || true)
+for app in $FLATPAK_APPS; do
+    grep -Fqx "$app" <<<"$installed" || echo "would install: $app"
+done
+"""
+
+# Both nested invocations go through ORCHESTRATOR_BIN for the same reason
+# (GEN-A-13).
+[tasks.preview-system]
+run = """
+"$ORCHESTRATOR_BIN" run --dry-run system
+"$ORCHESTRATOR_BIN" bootstrap packages apply --dry-run --manager dnf
 """

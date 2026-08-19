@@ -42,12 +42,13 @@ source named. An assumption with no status is a guess and SHALL NOT be relied
 upon.
 
 **Every assumption in the set is now `VERIFIED` and there are no open
-decisions.** The two items that were outstanding have been closed:
+decisions.** The two items that were outstanding are now resolved:
 
 - `APPS-A-5` - the orchestrator does **not** configure Flatpak remotes; an
   explicit preceding step is required (`APPS-R-7`).
-- `APPS-A-4` - desktop applications install **system-wide**, matching current
-  behaviour (`APPS-R-6`).
+- `APPS-A-4` - desktop applications now install in **user scope** (`APPS-R-10`),
+  superseding the earlier system-scope resolution that matched pre-migration
+  behaviour.
 
 ## Corrections recorded after implementation
 
@@ -61,16 +62,20 @@ kept their numbers:
   `[bootstrap.user].login_shell` for the login shell. The names this set
   originally recorded do not exist in mise 2026.8.6.
 - `ZSH-R-12` - zsh-autosuggestions is fetched to
-  `zsh/custom/plugins/zsh-autosuggestions`, not under `vendor/`.
+  `zsh/custom/plugins/zsh-autosuggestions`, not under `_vendor/`.
 - `KITTY-R-3` / `KITTY-R-4` - deployment replaces only a symbolic link that
   already points into this repository, and refuses anything else, rather than
   replacing whatever it finds.
 
 New identifiers were appended for behaviour that implementation added:
-`GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-R-8b`, `GEN-R-15` through
-`GEN-R-18`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through `ZSH-R-14`,
-`ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`, `APPS-R-9` and
-`APPS-A-9`.
+`GEN-D-15`, `GEN-A-8a`, `GEN-A-11`, `GEN-A-12`, `GEN-A-13`, `GEN-R-8b`, `GEN-R-15` through
+`GEN-R-18`, `GEN-R-19`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through
+`ZSH-R-14`, `ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`,
+`APPS-R-9`, `APPS-A-9`, `APPS-R-10` and `APPS-R-11`.
+
+`APPS-R-5` and `APPS-R-6` are withdrawn, their numbers retired: applications
+are installed in user scope by calling flatpak directly, rather than
+system-wide through the declarative table.
 
 ## Scope
 

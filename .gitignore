@@ -1,8 +1,9 @@
 **/.idea
 **/.vscode
 .build/
-vendor/
 zsh/zshrc
 zsh/config
 vim/init.vim
 zsh/custom/plugins/zsh-autosuggestions
+graphify-out/
+.superpowers/

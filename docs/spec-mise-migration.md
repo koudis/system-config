@@ -102,12 +102,12 @@ Consequences:
 - The Go SDK moves from its hardcoded path into the same directory, installed
   rather than assumed.
 - Fetched *runtime content* (ohmyzsh, cmakelib) stays in the repository under
-  `vendor/`, gitignored. It is read at runtime, not installed. The one
+  `_vendor/`, gitignored. It is read at runtime, not installed. The one
   exception is zsh-autosuggestions, which is fetched to
   `zsh/custom/plugins/zsh-autosuggestions` - also inside the repository, also
   gitignored - because Oh My Zsh resolves custom plugins only under
   `$ZSH_CUSTOM/plugins/` (ZSH-A-7, ZSH-R-12). Fetching it to its real load path
-  is preferred over fetching it to `vendor/` and adding a symlink.
+  is preferred over fetching it to `_vendor/` and adding a symlink.
 - Fetched *build inputs* (Neovim, CMake sources) land in `<repo>/.build`,
   gitignored, and are scratch.
 - Deleting the application directory and re-running setup restores a working
@@ -119,6 +119,9 @@ Consequences:
 
 `mise` is the sole orchestrator. A repo-root `mise.toml` is mise's native
 config-resolution case (it walks up from cwd), so no global config is involved.
+
+Superseded 2026-08-17: a global configuration is now involved, and it is this
+same file. See GEN-A-6 and ZSH-R-15.
 
 | Feature | Replaces |
 |---|---|
@@ -147,6 +150,21 @@ the rest of the work untestable.
 The wrapper is not the only exporter of `MISE_DATA_DIR`. The rendered zshrc is
 the second, and legitimately so - see 5.4.
 
+**Superseded in place (2026-08-19), for the second process-start variable.**
+Step 2 above describes the wrapper as exporting `MISE_DATA_DIR` alone. It
+exports two variables read at process start, not one: `MISE_DATA_DIR` beneath
+the application directory, and `MISE_INSTALLS_DIR` set to the application
+directory itself, so that each managed tool owns a directory named after it
+directly beneath that root instead of being buried under the data directory's
+own `installs/` tree. Everything this section says about why a process-start
+variable cannot come from `[env]` applies to the second one identically, and
+so does the two-exporter note above: the rendered zshrc exports both. The
+third process-start variable, `MISE_GLOBAL_CONFIG_FILE`, is exported by the
+rendered zshrc only and is superseded separately in section 5 - the wrapper
+does not need it, because it runs from inside the repository where the
+configuration is found by upward walk anyway. See GEN-R-16 and the
+application-layout spec.
+
 ### 5.2 System packages - use `[bootstrap.packages]`, with a fallback
 
 mise has native declarative system-package support covering exactly this
@@ -158,6 +176,8 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
 - `mise bootstrap packages apply --dry-run --manager <manager>` prints commands
   without running them, supplying the dry-run this repo has never had.
 - sudo elevation is explicit and logged. It never hangs waiting for a password.
+  This applies to the privileged phase only (GEN-R-19); the unprivileged phase
+  invokes no elevation.
 - `[bootstrap.user]` with key `login_shell` adds the shell to `/etc/shells` and
   applies `chsh -s`. **This removes the manual `chsh` step** that
   `zsh/README.md` documents today. The value must be an absolute path
@@ -165,9 +185,11 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
   `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
   authenticates the target user through PAM - which blocks on a password prompt
   for a non-root caller - and sudo's `secure_path` drops `$APP_DIR/bin`, where
-  mise itself lives.
-- Both managers' entries share one `[bootstrap.packages]` table, since TOML
-  forbids a duplicate header; they are separated at apply time by `--manager`.
+  mise itself lives. This apply runs in the privileged phase (GEN-R-19).
+- The `[bootstrap.packages]` table holds `dnf:` entries only. The seventeen
+  Flatpak applications are installed by calling `flatpak` directly from a task
+  body, in user scope, rather than through a `flatpak` manager entry in this
+  table (APPS-R-10, APPS-R-11).
 
 **The naming this section originally recorded was wrong.** An earlier draft
 described the table as a `packages` table under a `system` table, applied by an
@@ -190,7 +212,7 @@ instead of six files. The task DAG below is unchanged either way.
 all
  +-- packages   dnf packages + build prerequisites + login_shell
  +-- flathub    ensure flatpak CLI + unfiltered Flathub remote  (depends: packages)
- +-- apps       17 applications, system scope                   (depends: flathub)
+ +-- apps       17 applications, user scope                     (depends: flathub)
  +-- go         [tools] pin                                     (depends: packages)
  +-- cmake      [tools] pin, or source build                    (depends: packages)
  +-- fetch      clone/download + verify vendored sources
@@ -247,7 +269,7 @@ command exists is not an operating-system conditional and is not what GEN-R-8
 prohibits: GEN-R-8 targets branching on the platform, which is dead code in a
 Fedora-only repository, whereas this branches on whether setup has run yet -
 the normal state of the fresh notebook this repository exists to configure. The
-same idiom is used at `setup:14` and `test/run.sh:29`. See GEN-R-8b.
+same idiom is used at `setup:43` and `test/run.sh:73`. See GEN-R-8b.
 
 ### 5.5 Freshness strategy for build tasks
 
@@ -352,7 +374,7 @@ pin, so an explicit ref must be recorded or these silently start tracking
 
 `cmconf` is the currently-orphaned gitlink; it is declared properly here.
 zsh-autosuggestions is fetched to `zsh/custom/plugins/zsh-autosuggestions`
-rather than to `vendor/`, for the reason given in section 4.
+rather than to `_vendor/`, for the reason given in section 4.
 
 **Fetching never destroys a path it did not create** (GEN-R-17, GEN-R-17a).
 The fetch step refuses, without deleting, if the target path is a registered
@@ -399,7 +421,7 @@ deleted (ZSH-R-4).
 
 `ZSH_CUSTOM` gets its own template placeholder, `___ZSH_CUSTOM_DIR___`
 (ZSH-R-14). It cannot share the framework-path placeholder: the framework is
-fetched runtime content under `vendor/` while the custom directory is committed
+fetched runtime content under `_vendor/` while the custom directory is committed
 repository content under `zsh/`, and one placeholder cannot yield two unrelated
 roots.
 
@@ -420,7 +442,7 @@ of glibc in Fedora 35+, and without it the build fails on charset errors.
 Desktop applications (17): KiCad, FreeCAD, Anki, Obsidian, PrusaSlicer, drawio,
 Bottles, TeXstudio, OnlyOffice, JOSM, GitKraken, Krita, Flatseal, GNOME
 Extensions, Extension Manager, Arduino IDE2, Tellico. All tier 1 (Flatpak),
-installed **system-wide** - see 7.2.
+installed in **user scope** - see 7.2.
 
 Template placeholders. Two are ported, one is **added**, three are **deleted**:
 
@@ -446,7 +468,7 @@ rendered zshrc's `PATH`. On a fresh machine that PATH entry points at a
 directory that does not exist. `check_install_dir` does not catch it - it only
 tests for an empty string.
 
-Resolution: `[tools] go = "1.23.3"` in `mise.toml`. Version management is
+Resolution: a `[tools] go` pin in `mise.toml`. Version management is
 mise's core competency, the pin joins every other pin in one file, and the
 hardcoded `$HOME` path disappears. `___GO_BIN_DIR___` is then dropped from the
 template entirely, since `mise activate` puts Go on `PATH`.
@@ -488,8 +510,9 @@ machines, and it would not work anyway: when the Flatpak CLI is absent mise
 nothing instead of advancing. Tier 3 is per-application, not a blanket promise -
 GitKraken is proprietary and has no buildable source (APPS-R-3).
 
-**Scope is system-wide** (APPS-R-6), matching current behaviour, so no silent
-migration of 17 applications between scopes.
+**Scope is user** (APPS-R-10), a deliberate migration of 17 applications away
+from the pre-migration system-wide scope, accepted because it removes
+elevation from the default path.
 
 **The remote is this repo's responsibility.** mise does not install Flatpak or
 configure remotes implicitly, so an explicit preceding step must ensure the CLI
@@ -550,10 +573,11 @@ regression guard rather than a live safeguard, and it is retained as such.
 
 ## 10. Acceptance criteria
 
-1. `git clone <https-url> && cd && ./setup` succeeds on a fresh Fedora box with
-   no SSH key configured.
-2. A second `./setup` immediately afterwards is a no-op for every task and
-   exits non-zero nowhere.
+1. `git clone <https-url> && cd && sudo -v && ./setup system && ./setup`
+   succeeds on a fresh Fedora box with no SSH key configured.
+2. A second run of each phase immediately afterwards is a no-op for every task
+   and exits non-zero nowhere: `./setup system` a second time, and separately
+   `./setup` a second time.
 3. `git submodule status` reports nothing.
 4. No file outside the repository and the application directory except the
    three symlinks and their parent dirs.
@@ -567,12 +591,18 @@ regression guard rather than a live safeguard, and it is retained as such.
 10. No absolute path containing a hardcoded username appears anywhere in the
     repo (`grep -rn '/home/[a-z]' --include='*_template'` returns nothing).
 11. All 17 applications install on a box with Third-Party Repositories disabled
-    and no Flathub remote configured, and all report system scope.
+    and no Flathub remote configured, and all report user scope.
 12. Every declared package name resolves in Fedora's repositories - in
     particular `the_silver_searcher` and `python3-neovim`, not `ag` and
     `python-neovim`.
-13. The Neovim build succeeds on a Fedora box with no development tooling
-    pre-installed, proving the prerequisite list is complete.
+13. The Neovim build succeeds on a Fedora box carrying only
+    `test/Containerfile.nosudo`'s hand-written prerequisite list, proving that
+    list is complete. This no longer proves `[bootstrap.packages]`'s dnf list
+    is complete: `[tasks.nvim]` now depends on `preflight`, not `packages`, so
+    the build never touches the privileged phase's dnf install. Three lists -
+    `[bootstrap.packages]`'s dnf entries, preflight's seven commands, and
+    `Containerfile.nosudo`'s dnf line - must still agree by hand; nothing
+    compares them (see design spec section 6.1).
 14. No operating-system conditional exists anywhere in the repository
     (GEN-R-8).
 15. Every managed tool has a requirements document (GEN-R-13); the identifier
@@ -598,16 +628,20 @@ regression guard rather than a live safeguard, and it is retained as such.
   17 application IDs; it never installs them. A resolvable ID can still fail to
   install for reasons no check covers - disk space, architecture, runtime
   conflicts - and the first real signal comes from the user's own machine. A
-  real `flatpak install --system` needs a working system bus the sandboxed
-  container does not have, so nothing cheap closes this. Bounded by the fact
-  that the same apply mechanism is proven with `--manager dnf`. See APPS-A-9.
+  real `flatpak install --user` needs a working system bus the sandboxed
+  container does not have, so nothing cheap closes this. Every identifier is
+  proven to resolve, which bounds resolution risk; it does not bound whether
+  the install itself succeeds, since the applications are now installed by a
+  direct `flatpak install --user` call that shares no apply path with the dnf
+  packages proven elsewhere. See APPS-A-9.
 - **RR6 (low): the login-shell change needs an absolute path and elevation with
   `PATH` forwarded.** `login_shell` must be `/usr/bin/zsh`; mise rejects the
   bare name. Applying it requires
   `sudo env "PATH=$PATH" mise bootstrap user apply --yes`, because `chsh`
   authenticates through PAM and sudo's `secure_path` drops `$APP_DIR/bin`. The
   apply is unconditional, so it asks for elevation on every run even when the
-  shell is already set. See ZSH-A-8 and ZSH-A-9.
+  shell is already set. This per-run elevation applies to `./setup system`
+  only, not to the default `./setup`. See ZSH-A-8 and ZSH-A-9.
 
 Resolved during validation, in order of discovery: ohmyzsh tarball breakage
 (now specified as a git clone, 6.2); Neovim tarball version stamping (safe at

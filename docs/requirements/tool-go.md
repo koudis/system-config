@@ -33,20 +33,22 @@ file, installed by setup like every other tool.
 
 | Property | Value |
 |---|---|
-| Version | 1.23.3 - the version the hardcoded path refers to |
+| Version | recorded in the pin registry (GEN-D-16) under key `go` |
 | Current pin mechanism | none; a literal path fragment |
 | Required pin mechanism | single entry in the pin file |
 
 **GO-A-3** Go is a first-class tool in the orchestrator's own tool set, so no
 plugin or custom backend is required. Plain version numbers are accepted for
-1.21 and later; only 1.20 and earlier require special version syntax. At 1.23.3
-the plain form applies. `VERIFIED` - orchestrator language documentation.
+1.21 and later; only 1.20 and earlier require special version syntax. The
+pinned version is well past that boundary, so the plain form applies.
+`VERIFIED` - orchestrator language documentation.
 
 ## 5. Path exposure
 
 **GO-R-2** The hardcoded path fragment SHALL be removed from the shell template.
-Visibility of the Go binaries SHALL come from the orchestrator's shell
-activation, which covers every installed tool uniformly (see ZSH-R-11).
+Visibility of the Go binaries SHALL come from the orchestrator instead, and
+SHALL be machine-wide as the removed fragment was: activation beneath this
+repository, and the global configuration (ZSH-R-15) everywhere else.
 
 **GO-R-3** No consumer SHALL reference the Go SDK by literal path. The version
 appears once, in the pin file (GEN-R-7).
@@ -68,7 +70,7 @@ a template.
 
 | Requirement | Check |
 |---|---|
-| GO-R-1 | Go reports version 1.23.3 after setup on a clean machine |
-| GO-R-2 | Every entry in the resulting search path exists |
+| GO-R-1 | Go reports the pinned version after setup on a clean machine |
+| GO-R-2 | Every entry in the resulting search path exists, and Go reports the pinned version from a directory outside this repository |
 | GO-R-3 | Searching the repository for a literal Go SDK path returns nothing |
 | GO-R-4 | Searching the repository for the Haskell environment path returns nothing |
