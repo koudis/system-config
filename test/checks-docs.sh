@@ -10,6 +10,13 @@ assert_cmd "no requirements doc restates a pinned value" bash -c '
             echo "restated pin value: $value" >&2
             fail=1
         fi
+        # A 40-hex commit SHA is also restated in its short (7-char) form,
+        # e.g. `3bd355a` for `3bd355abf8...` - the same pin, and it goes
+        # stale exactly like the full value would.
+        if [[ "$value" =~ ^[0-9a-f]{40}$ ]] && grep -rqF "${value:0:7}" docs/requirements/; then
+            echo "restated pin value (abbreviated): ${value:0:7}" >&2
+            fail=1
+        fi
     done <<< "$(grep -v "^min_version" mise.toml \
                 | sed -n "s/^[A-Za-z_]* *= *\"\([^\"]*\)\".*/\1/p" \
                 | grep -E "^(v?[0-9]+\.[0-9]+|[0-9a-f]{40})")"

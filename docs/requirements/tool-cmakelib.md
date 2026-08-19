@@ -20,10 +20,10 @@ Five separate sources, all currently submodules.
 
 | Component | Pin | Recorded as |
 |---|---|---|
-| cmakelib | `3bd355a` (`v1.3.4-1-g...`) | commit SHA |
+| cmakelib | recorded in the pin registry (GEN-D-16) under key `CMLIB_REF` | commit SHA |
 | component-cmconf | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMCONF_REF` | tag |
 | component-cmdef | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMDEF_REF` | tag |
-| component-cmutil | `66ea4a9` (`v1.1.0-3-g...`) | commit SHA |
+| component-cmutil | recorded in the pin registry (GEN-D-16) under key `CMLIB_CMUTIL_REF` | commit SHA |
 | component-storage | `v1.0.0` | tag |
 
 **CMLIB-A-1** One of the five is currently an orphaned gitlink: it exists in the

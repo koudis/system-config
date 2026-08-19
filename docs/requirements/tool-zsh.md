@@ -23,8 +23,8 @@ Mixed, and the parts are deliberately separated:
 
 | Source | Pin | Recorded as |
 |---|---|---|
-| Oh My Zsh | `b54a7197` | commit SHA - there is no tag |
-| Autosuggestions | `c3d4e57` (`v0.7.0-12-g...`) | commit SHA |
+| Oh My Zsh | recorded in the pin registry (GEN-D-16) under key `OHMYZSH_REF` | commit SHA - there is no tag |
+| Autosuggestions | recorded in the pin registry (GEN-D-16) under key `AUTOSUGGEST_REF` | commit SHA |
 
 **ZSH-R-1** Both SHALL be fetched over HTTPS anonymously (GEN-A-4) and pinned by
 SHA. Neither may track a branch.
