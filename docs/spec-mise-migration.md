@@ -120,6 +120,9 @@ Consequences:
 `mise` is the sole orchestrator. A repo-root `mise.toml` is mise's native
 config-resolution case (it walks up from cwd), so no global config is involved.
 
+Superseded 2026-08-17: a global configuration is now involved, and it is this
+same file. See GEN-A-6 and ZSH-R-15.
+
 | Feature | Replaces |
 |---|---|
 | `[tasks]` with `depends` | `. ${project_setup}` sourcing + `unset setup` hack |

@@ -46,8 +46,9 @@ pinned version is well past that boundary, so the plain form applies.
 ## 5. Path exposure
 
 **GO-R-2** The hardcoded path fragment SHALL be removed from the shell template.
-Visibility of the Go binaries SHALL come from the orchestrator's shell
-activation, which covers every installed tool uniformly (see ZSH-R-11).
+Visibility of the Go binaries SHALL come from the orchestrator instead, and
+SHALL be machine-wide as the removed fragment was: activation beneath this
+repository, and the global configuration (ZSH-R-15) everywhere else.
 
 **GO-R-3** No consumer SHALL reference the Go SDK by literal path. The version
 appears once, in the pin file (GEN-R-7).
@@ -70,6 +71,6 @@ a template.
 | Requirement | Check |
 |---|---|
 | GO-R-1 | Go reports the pinned version after setup on a clean machine |
-| GO-R-2 | Every entry in the resulting search path exists |
+| GO-R-2 | Every entry in the resulting search path exists, and Go reports the pinned version from a directory outside this repository |
 | GO-R-3 | Searching the repository for a literal Go SDK path returns nothing |
 | GO-R-4 | Searching the repository for the Haskell environment path returns nothing |

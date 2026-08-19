@@ -139,6 +139,14 @@ Configuration resolution walks upward from the working directory, so a
 repository-root configuration file is the native case and no machine-global
 configuration participates. `VERIFIED` - upstream configuration documentation.
 
+`SUPERSEDED IN PART 2026-08-17`: the closing clause ("no machine-global
+configuration participates") no longer holds. Upward resolution is unchanged
+and still correct; what changed is that this repository now names its own
+configuration file as the global one (ZSH-R-15), deliberately, so that pinned
+tools resolve outside the repository. No pin is duplicated by this - the
+global configuration is the pin registry (GEN-D-16), reached by a second
+route.
+
 **GEN-A-7 The tool-install location is fixed before the orchestrator starts.**
 The variable controlling where tools are installed is read at process start and
 cannot be set from within the orchestrator's own configuration. A wrapper must

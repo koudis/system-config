@@ -317,6 +317,7 @@ render() {
     sed -e "s|___OHMYZSH_PROJECT_DIR___|${root}/_vendor|g" \
         -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
         -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
+        -e "s|___MISE_CONFIG_FILE___|${root}/mise.toml|g" \
         "$template" > "$new"
     # sha256sum, not cmp: cmp ships in diffutils, which a minimal Fedora
     # install does not have, and a comparison that errors out would refuse
