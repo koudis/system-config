@@ -15,3 +15,12 @@ assert_cmd "go installs directly under APP_DIR" bash -c '
 assert_cmd "cmake installs directly under APP_DIR" bash -c '
     [ -d "${APP_DIR}/cmake" ] && [ ! -d "${APP_DIR}/mise/installs/cmake" ]
 '
+# GEN-R-21: exactly one full-version directory per pinned tool. mise also
+# creates partial-version alias symlinks (1, 1.26, latest), which grep's
+# anchored N.N.N pattern does not count as installs.
+assert_cmd "exactly one go version installed" bash -c '
+    [ "$(ls -1 "${APP_DIR}/go" | grep -c "^[0-9]*\.[0-9]*\.[0-9]*$")" -eq 1 ]
+'
+assert_cmd "exactly one cmake version installed" bash -c '
+    [ "$(ls -1 "${APP_DIR}/cmake" | grep -c "^[0-9]*\.[0-9]*\.[0-9]*$")" -eq 1 ]
+'
