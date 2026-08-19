@@ -155,11 +155,14 @@ assert_cmd "a login shell outside the repository resolves the pinned go" \
 
 # GEN-R-16's first observable, on the same shell: a session that exported
 # nothing itself still reports both orchestrator directories under APP_DIR.
+# Labelled and matched whole-line rather than by position: some Oh My Zsh
+# plugins report a missing optional dependency (fzf, direnv, ~/.ssh) on stdout
+# rather than stderr, so the values are not the first lines of the output.
 login_places_orchestrator_dirs() {
     local out
-    out=$(login_shell 'printf "%s\n%s\n" "$MISE_DATA_DIR" "$MISE_INSTALLS_DIR"') || return 1
-    [[ $(sed -n 1p <<< "$out") == "$APP_DIR/mise" ]] &&
-    [[ $(sed -n 2p <<< "$out") == "$APP_DIR" ]]
+    out=$(login_shell 'printf "data=%s\ninstalls=%s\n" "$MISE_DATA_DIR" "$MISE_INSTALLS_DIR"') || return 1
+    grep -qxF "data=$APP_DIR/mise" <<< "$out" &&
+    grep -qxF "installs=$APP_DIR" <<< "$out"
 }
 assert_cmd "a login shell places both orchestrator directories under APP_DIR" \
     login_places_orchestrator_dirs
