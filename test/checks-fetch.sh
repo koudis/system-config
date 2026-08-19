@@ -41,6 +41,5 @@ assert_cmd "the vendored directory is gone" bash -c '[ ! -d _vendor ]'
 assert_cmd "the fixed-path exception still holds" bash -c '
     [ -d zsh/custom/plugins/zsh-autosuggestions ]
 '
-assert_cmd "no {{config_root}} template use in the pin file" bash -c '
-    ! grep -v "^[[:space:]]*#" mise.toml | grep -q "{{[[:space:]]*config_root"
-'
+assert_cmd "no config_root template expression anywhere in the pin file" bash -c \
+    '! grep -q "{{[[:space:]]*config_root" mise.toml'
