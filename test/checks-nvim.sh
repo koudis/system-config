@@ -13,3 +13,9 @@ assert_cmd        "stamp matches current pin"    bash -c \
     '[[ "$(sed -n 1p .build/nvim.version)" == "$NVIM_VERSION" ]]'
 assert_cmd        "stamp matches current prefix" bash -c \
     '[[ "$(sed -n 2p .build/nvim.version)" == "$APP_DIR" ]]'
+assert_cmd "nvim owns one directory under APP_DIR" bash -c '
+    [ -x "${APP_DIR}/nvim/bin/nvim" ]
+'
+assert_cmd "nvim does not scatter into APP_DIR root" bash -c '
+    [ ! -e "${APP_DIR}/lib64" ] && [ ! -e "${APP_DIR}/share/nvim" ]
+'
