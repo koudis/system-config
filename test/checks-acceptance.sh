@@ -40,3 +40,23 @@ assert_cmd "every tool has a requirements document" \
     bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps; do
                  test -f "docs/requirements/tool-$t.md" || exit 1
              done'
+
+# The end-state layout: eight earlier tasks moved every managed tool under
+# its own name inside APP_DIR and retired the shared App/bin/. These read the
+# installed application directory, not the repository, so they need a target
+# that actually populates it (unlike every check above).
+assert_cmd "one directory per managed tool" bash -c '
+    for tool in go cmake cmakelib mise nvim ohmyzsh; do
+        [ -d "${APP_DIR}/${tool}" ] || { echo "missing: ${tool}" >&2; exit 1; }
+    done
+'
+assert_cmd "application root is not a dumping ground" bash -c '
+    [ ! -e "${APP_DIR}/lib64" ] && [ ! -e "${APP_DIR}/share/nvim" ]
+'
+assert_cmd "no bare bin directory survives" bash -c '
+    [ ! -e "${APP_DIR}/bin" ]
+'
+assert_cmd "the search path names exactly two APP_DIR entries" bash -c '
+    [ "$(printf "%s\n" $PATH | tr ":" "\n" | grep -c "^${APP_DIR}/")" -eq 2 ] &&
+    [ -d "${APP_DIR}/mise/bin" ] && [ -d "${APP_DIR}/nvim/bin" ]
+'
