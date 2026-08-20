@@ -21,6 +21,7 @@ instructions to be executed.
 | [tool-go.md](tool-go.md) | Go toolchain - currently unmanaged |
 | [tool-kitty.md](tool-kitty.md) | Terminal emulator - the simplest case |
 | [tool-desktop-apps.md](tool-desktop-apps.md) | Seventeen Flatpak applications |
+| [tool-bootstrap-ai-coding.md](tool-bootstrap-ai-coding.md) | Containerised AI coding sessions - built from source |
 | [../adding-a-new-tool.md](../adding-a-new-tool.md) | The procedure for adding a managed tool |
 
 ## How to read a tool document

@@ -377,6 +377,7 @@ document MAY describe what its pin means but SHALL NOT reproduce the value.
 | cmake | dev tool | `[tools]` | `cmake` |
 | go | dev tool | `[tools]` | `go` |
 | neovim | build input | `[env]` | `NVIM_VERSION` |
+| bootstrap-ai-coding | build input | `[env]` | `BAC_REF` |
 | oh-my-zsh | runtime content | `[env]` | `OHMYZSH_REF` |
 | zsh-autosuggestions | runtime content | `[env]` | `AUTOSUGGEST_REF` |
 | cmakelib | runtime content | `[env]` | `CMLIB_REF` |

@@ -20,6 +20,7 @@ CMLIB_CMCONF_REF   = "v1.2.1"
 CMLIB_CMDEF_REF    = "v1.0.3"
 CMLIB_CMUTIL_REF   = "66ea4a90adfe67567006e09b26122f370eeb2066"
 CMLIB_STORAGE_REF  = "f4080a0e6e8a47831f04bbd371871fecaf5d9560"
+BAC_REF            = "v3.1.0"
 
 # cmakelib's own outputs (CMLIB-R-2), declared here rather than emitted from
 # the shell template. This is what removes the hidden coupling flagged by
@@ -254,7 +255,7 @@ MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools $pinned
 run = """
 set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
-mkdir -p "$APP_DIR/cmakelib" zsh/custom/plugins
+mkdir -p "$APP_DIR/cmakelib" "$APP_DIR/bac" zsh/custom/plugins
 
 # R25: never destroy a directory this task did not create. A registered
 # submodule gitlink, or any uncommitted local changes, stop the task with a
@@ -329,6 +330,12 @@ fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmconf"  https://github.com/c
 fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmdef"   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
 fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmutil"  https://github.com/cmakelib/cmakelib-component-cmutil.git  "$CMLIB_CMUTIL_REF"
 fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-storage" https://github.com/cmakelib/cmakelib-component-storage.git "$CMLIB_STORAGE_REF"
+# The one fetched source that is compiled rather than read (BAC-R-8): it takes
+# the same guards as every other checkout, which is the whole reason the build
+# does not clone for itself. Its outputs land in this checkout and upstream
+# ignores them (BAC-A-10), so the work tree stays clean and a later pin bump is
+# not refused by refuse_if_dirty above.
+fetch_pinned "$APP_DIR/bac/src" https://github.com/koudis/bootstrap-ai-coding.git "$BAC_REF"
 """
 
 # A task gated by its own sources/outputs cannot be the one writing its
@@ -374,6 +381,45 @@ make CMAKE_BUILD_TYPE=RelWithDebInfo \
      CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" \
      CMAKE_PRG="$(command -v cmake)"
 make CMAKE_INSTALL_PREFIX="$APP_DIR/nvim" install
+"""
+
+# The same split as [tasks.nvim-stamp] above, for the same reason (GEN-R-18,
+# BAC-R-10): an ungated step writes the stamp from the current env, so a pin
+# change is visible to the gate below before the gate decides. Unchanged
+# inputs reproduce byte-identical content, so the gate still skips.
+[tasks.bac-stamp]
+run = """
+mkdir -p .build
+printf '%s\n%s\n' "$BAC_REF" "$APP_DIR" > .build/bac.version
+"""
+
+# `make release`, not a restated `go build` (BAC-R-11): the recipe's link-time
+# flags inject the version string that `bac --version` reports, derived from
+# `git describe` against the checkout the fetch task placed at the pinned tag.
+# Restating them here would be a second copy of upstream's build configuration
+# whose drift shows up as a binary misreporting its own version rather than as
+# a build failure. The recipe cross-compiles both architectures upstream
+# publishes and only the host's is installed (BAC-A-11).
+#
+# Unlike [tasks.nvim], the compiler is not located by an explicit path: the
+# recipe invokes a bare `go`, and reaching past that would mean restating the
+# recipe. mise puts the [tools]-declared Go on PATH for task execution, which
+# is what makes the bare name resolve to the pinned toolchain (BAC-A-12).
+#
+# `install`, not `cp`: the mode is stated rather than inherited from whatever
+# umask the run happens to carry. The architecture comes from the toolchain
+# rather than a literal (BAC-R-12); on an architecture upstream does not build
+# for, install fails naming the file that is missing.
+[tasks.bac]
+depends = ["tools", "preflight", "fetch", "bac-stamp"]
+sources = [".build/bac.version"]
+outputs = ["{{env.APP_DIR}}/bac/bin/bac"]
+run = """
+set -euo pipefail
+src="$APP_DIR/bac/src"
+make -C "$src" release
+mkdir -p "$APP_DIR/bac/bin"
+install -m 0755 "$src/bac-linux-$(go env GOARCH)" "$APP_DIR/bac/bin/bac"
 """
 
 # No sources/outputs (R12): mise has open upstream bugs where freshness
@@ -467,7 +513,7 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["preflight", "apps", "tools", "fetch", "nvim", "render", "link"]
+depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.

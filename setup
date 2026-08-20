@@ -52,7 +52,7 @@ if [ ! -x "$APP_DIR/mise/bin/mise" ]; then
     curl -fsSL https://mise.run \
       | MISE_VERSION="v${mise_version}" MISE_INSTALL_PATH="$APP_DIR/mise/bin/mise" sh
 fi
-export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$PATH"
+export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$APP_DIR/bac/bin:$PATH"
 
 # mise refuses to load an untrusted config file. Without this, the first run on
 # a fresh machine either prompts or does nothing.

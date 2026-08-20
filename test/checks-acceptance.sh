@@ -1,6 +1,12 @@
 # Spec section 10 criteria that no single tool task owns: the end state of the
-# migration itself. Every check reads the repository, not the installed system,
-# so the mise target this runs against is immaterial.
+# migration itself. Most checks read the repository rather than the installed
+# system, but not all of them: the layout and search-path checks below read the
+# application directory, and the login-shell checks read the deployed profile,
+# so this set does have a target it must be run against. It is the one that
+# populates every managed tool's directory without pulling in the desktop
+# applications:
+#
+#   test/run.sh acceptance "nvim ::: bac ::: link" unprivileged
 
 # Criterion 3. `git ls-files -s`, not `git submodule status`, is the primary
 # test: it sees a gitlink whether or not `.gitmodules` declares one, and an
@@ -37,7 +43,7 @@ assert_cmd "no ssh urls" \
     bash -c '! git grep -q "git@github.com" -- "*.toml" setup ":!test/checks-acceptance.sh"'
 
 assert_cmd "every tool has a requirements document" \
-    bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps; do
+    bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps bootstrap-ai-coding; do
                  test -f "docs/requirements/tool-$t.md" || exit 1
              done'
 
@@ -46,7 +52,7 @@ assert_cmd "every tool has a requirements document" \
 # installed application directory, not the repository, so they need a target
 # that actually populates it (unlike every check above).
 assert_cmd "one directory per managed tool" bash -c '
-    for tool in go cmake cmakelib mise nvim ohmyzsh; do
+    for tool in go cmake cmakelib mise nvim ohmyzsh bac; do
         [ -d "${APP_DIR}/${tool}" ] || { echo "missing: ${tool}" >&2; exit 1; }
     done
 '
@@ -61,19 +67,20 @@ assert_cmd "no bare bin directory survives" bash -c '
 # bin directories mise injects for [tools] - $APP_DIR/cmake/<version>/bin,
 # $APP_DIR/go/<version>/bin - legitimately live under it too. That is
 # orchestrator resolution working correctly, not a violation of it; every
-# pinned tool except mise and nvim is meant to be reached that way rather
-# than by path. A raw count of four therefore does not mean what it would
+# pinned tool except mise, nvim and bac is meant to be reached that way rather
+# than by path. A raw count therefore does not mean what it would
 # have meant before MISE_INSTALLS_DIR moved: it is not evidence of anything
 # this repository forbids. What the spec actually claims is narrower - that
-# THIS REPOSITORY's own two entries are on PATH and exist, and that the
+# THIS REPOSITORY's own entries are on PATH and exist, and that the
 # retired shared bin directory is gone from both PATH and disk. That splits
-# into the two checks below; the repository's own export naming exactly two
-# entries is asserted separately against the rendered profile in
+# into the two checks below; the repository's own export naming exactly those
+# entries and no others is asserted separately against the rendered profile in
 # test/checks-render.sh, which is where that export actually lives.
-assert_cmd "mise/bin and nvim/bin are on PATH and exist" bash -c '
-    [ -d "${APP_DIR}/mise/bin" ] && [ -d "${APP_DIR}/nvim/bin" ] &&
-    printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/mise/bin" &&
-    printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/nvim/bin"
+assert_cmd "the repository's own bin directories are on PATH and exist" bash -c '
+    for own in mise nvim bac; do
+        [ -d "${APP_DIR}/${own}/bin" ] || exit 1
+        printf "%s\n" $PATH | tr ":" "\n" | grep -qxF "${APP_DIR}/${own}/bin" || exit 1
+    done
 '
 assert_cmd "the retired shared bin directory is gone from disk and PATH" bash -c '
     [ ! -e "${APP_DIR}/bin" ] &&

@@ -29,7 +29,7 @@ assert_cmd "every registry key resolves in the pin file" bash -c '
     fail=0
     for key in min_version cmake go NVIM_VERSION OHMYZSH_REF AUTOSUGGEST_REF \
                CMLIB_REF CMLIB_CMCONF_REF CMLIB_CMDEF_REF CMLIB_CMUTIL_REF \
-               CMLIB_STORAGE_REF; do
+               CMLIB_STORAGE_REF BAC_REF; do
         grep -qE "^ *$key *=" mise.toml || { echo "missing key: $key" >&2; fail=1; }
     done
     [ "$fail" -eq 0 ]

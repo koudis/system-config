@@ -11,11 +11,13 @@ System config repo to configure basics applications after fresh Linux install.
 - NeoVim
 - ZSH
 - Kitty
+- [bootstrap-ai-coding] (`bac`) - containerised AI coding sessions
 - Desktop applications, installed as Flatpaks from Flathub
 
 One requirements document per entry lives in `docs/requirements/`.
 
 [CMakeLib]: https://github.com/cmakelib/cmakelib
+[bootstrap-ai-coding]: https://github.com/koudis/bootstrap-ai-coding
 
 ## Build and Install
 
@@ -50,6 +52,31 @@ not move anything or change the default.
 
 A single task can be run on its own by naming it, for example `./setup link`.
 `./setup preview` reports what a run would change without changing it.
+
+## External prerequisites
+
+Two things `bac` needs at run time are deliberately neither installed nor
+configured by setup.
+
+**A Docker engine.** `bac` speaks the Docker Engine API and refuses to start
+against a daemon older than 20.10. Fedora's own `moby-engine` package is *not*
+declared as a prerequisite, because it conflicts with the `docker-ce` packages
+from Docker's own repository: declaring it would make `./setup system` fail on
+any machine already running Docker CE, and the only way through the conflict
+erases a working engine. Install an engine by whichever route you prefer, then
+enable it and grant your account access:
+
+```bash
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+```
+
+The group change takes effect at your next login. Membership of the `docker`
+group is equivalent to root on this machine, which is why setup does not grant
+it for you.
+
+**An SSH key pair.** `bac` reads `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`,
+or the path given to its `--ssh-key` flag. It does not create one.
 
 ## Generated files
 
