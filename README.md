@@ -92,7 +92,7 @@ service - three paths outside `$APP_DIR`, two of them requiring elevation. A
 it:
 
 ```bash
-~/App/luks-automount/bin/luks-automount install
+$APP_DIR/luks-automount/bin/luks-automount install
 ```
 
 It asks before each of its three steps. Setup prints that command whenever the

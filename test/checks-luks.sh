@@ -1,13 +1,23 @@
 # LUKS_REF is read out of mise.toml, never restated here - see the note in
-# test/checks-tools.sh. Unlike bac there is no binary-reported version to
-# cross-check it against (LUKS-A-4), so the stamp is the only thing that can
-# be held against the pin file.
+# test/checks-tools.sh. Unlike bac there is no version the binary reports
+# itself (LUKS-A-4), so this holds the artifact against the pin through the Go
+# toolchain's build metadata instead: the binary reports no version of its own,
+# but the toolchain stamps the source revision into it regardless.
+assert_cmd "the staged binary carries the pinned commit" bash -c '
+    rev=$(git -C "${APP_DIR}/luks-automount/src" rev-parse --verify "$LUKS_REF^{commit}") &&
+    go version -m "${APP_DIR}/luks-automount/bin/luks-automount" | grep -qF "vcs.revision=$rev"'
 assert_cmd "the staged binary runs" bash -c '
     "${APP_DIR}/luks-automount/bin/luks-automount" --help'
 assert_cmd "luks-automount owns one directory under APP_DIR" bash -c '
     [ -x "${APP_DIR}/luks-automount/bin/luks-automount" ] &&
     [ -d "${APP_DIR}/luks-automount/src" ]
 '
+# LUKS-R-9's second half: the application root gains nothing beyond the two
+# subdirectories the tool is allowed. Unlike bac, this build's stray-output
+# risk lands inside src/ (LUKS-A-9), not the application root, so this checks
+# the tool's own directory rather than APP_DIR's.
+assert_cmd "luks-automount adds nothing beside src and bin" bash -c '
+    [[ "$(ls -A "${APP_DIR}/luks-automount" | sort | tr "\n" " ")" == "bin src " ]]'
 # Resolved the tag-or-SHA-aware way the fetch task uses, because LUKS_REF is a
 # tag rather than a commit SHA (see the cmakelib components in checks-fetch.sh).
 assert_cmd "the checkout is at the pinned ref" bash -c '

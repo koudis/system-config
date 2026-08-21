@@ -385,6 +385,7 @@ document MAY describe what its pin means but SHALL NOT reproduce the value.
 | cmakelib-component-cmdef | runtime content | `[env]` | `CMLIB_CMDEF_REF` |
 | cmakelib-component-cmutil | runtime content | `[env]` | `CMLIB_CMUTIL_REF` |
 | cmakelib-component-storage | runtime content | `[env]` | `CMLIB_STORAGE_REF` |
+| luks-automount | build input | `[env]` | `LUKS_REF` |
 
 ### Verifiability
 

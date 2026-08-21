@@ -51,14 +51,23 @@ upstream tag list was read on 2026-08-21 and the pinned tag resolves to a
 single commit. Should that stop holding, GEN-R-6 requires the key to hold the
 commit instead; that is a change of value, not of structure.
 
-**LUKS-A-4** The binary cannot report its own version, so the pin is not
-recoverable from the installed artifact. Upstream's root command declares no
-version and its release recipe computes a version string that its link flags
-never inject. The version stamp (LUKS-R-9) is therefore the only record of what
-the staged binary was built from, and the notice (LUKS-R-4) compares content
-rather than versions because content is the only thing there is to compare.
-`VERIFIED` - upstream's root command and build recipe for the pinned tag, read
-on 2026-08-21.
+**LUKS-A-4** The binary cannot report its own version: upstream's root command
+declares no `Version` and registers no `version` subcommand, and its release
+recipe computes a version string that its link flags never inject. `VERIFIED` -
+upstream's root command and build recipe for the pinned tag, read on
+2026-08-21.
+
+That does not make the pin unrecoverable from the artifact, though: the Go
+toolchain's own build metadata embeds the source revision independently of
+anything upstream injects, and a check can hold the staged binary against the
+pin through it rather than through a version the binary would report itself.
+`VERIFIED` - a binary built from the pinned tag, inspected with `go version
+-m`, reports a `vcs.revision` equal to the commit the pinned tag resolves to.
+
+The version stamp (LUKS-R-12) remains what build freshness is keyed on, and the
+notice (LUKS-R-4) still compares content rather than versions: the system copy
+is a byte copy of the staged one, so content is the right thing to compare
+there.
 
 ## 4. Build prerequisites
 
@@ -191,7 +200,7 @@ anything.
 |---|---|
 | LUKS-R-1 | The pinned value appears in the pin registry and in no requirements document |
 | LUKS-A-3 | The source checkout's head resolves to the same commit as the pinned ref |
-| LUKS-A-4 | No check asserts a version; the stamp is asserted against the pin registry instead |
+| LUKS-A-4 | The staged binary's `go version -m` output reports a `vcs.revision` matching the commit the pinned ref resolves to |
 | LUKS-R-2, LUKS-A-5 | The build succeeds in the unprivileged harness image, which carries no prerequisite this repository does not declare and no system Go |
 | LUKS-R-2a | Both packages are installed after the privileged phase |
 | LUKS-R-3, LUKS-A-8, LUKS-R-5 | After a full unprivileged run, the fixed system path, the sudoers path and the user unit path all remain absent |
