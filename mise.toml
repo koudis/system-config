@@ -465,6 +465,45 @@ mkdir -p "$APP_DIR/luks-automount/bin"
 install -m 0755 "$src/luks-automount" "$APP_DIR/luks-automount/bin/luks-automount"
 """
 
+# Ungated on purpose, and separate from [tasks.luks] for the same structural
+# reason the stamp is separate (LUKS-R-12): the build is freshness-gated, so on
+# a second run it is skipped and anything printed from inside it would not
+# print. This is the one message this repository emits that is neither a
+# failure nor progress - it is the step LUKS-R-3 hands back to the user, named
+# at the moment the machine needs it.
+#
+# Exits zero in every branch (LUKS-R-4). A fresh machine has not run the
+# one-time step by construction; failing here would make ./setup fail on
+# exactly the machine it exists to configure.
+#
+# sha256sum, not cmp: cmp comes from diffutils, which no Containerfile declares
+# and which is present in the harness image only as a transitive dependency of
+# the compiler packages. Depending on an undeclared package inside a task body
+# is what GEN-R-14 exists to prevent. The redirections keep the file names out
+# of the digests being compared.
+#
+# The system path is a literal here and nowhere else: it is upstream's, fixed
+# in its installer and named verbatim by the sudoers rule it writes, so it is a
+# fact about the external tool rather than a path this repository chooses. It is
+# not an install prefix of this repository's (GEN-R-1a) - nothing here ever
+# writes to it.
+[tasks.luks-notice]
+depends = ["luks"]
+run = """
+set -euo pipefail
+staged="$APP_DIR/luks-automount/bin/luks-automount"
+installed=/usr/local/bin/luks-automount
+if [[ ! -e $installed ]]; then
+    echo "luks-automount: not installed on this machine." >&2
+    echo "luks-automount: run this once, and answer its three prompts:" >&2
+    echo "luks-automount:   $staged install" >&2
+elif [[ "$(sha256sum < "$staged")" != "$(sha256sum < "$installed")" ]]; then
+    echo "luks-automount: $installed differs from the staged build." >&2
+    echo "luks-automount: re-run this to bring it up to date:" >&2
+    echo "luks-automount:   $staged install" >&2
+fi
+"""
+
 # No sources/outputs (R12): mise has open upstream bugs where freshness
 # misfires with multiple outputs, and the body is two renders - always running
 # it is idempotent by construction and, unlike a freshness gate, also
