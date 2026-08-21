@@ -95,6 +95,11 @@ login_shell = "/usr/bin/zsh"
 "dnf:glibc-gconv-extra"   = "latest"
 "dnf:git"                 = "latest"
 "dnf:flatpak"             = "latest"
+# luks-automount's runtime prerequisites (LUKS-R-2a). Neither is a build
+# prerequisite and neither belongs in the preflight list, which gates only what
+# the unprivileged tasks execute.
+"dnf:cryptsetup"          = "latest"
+"dnf:gnome-keyring"       = "latest"
 
 # --manager dnf is not required for correctness now that this table holds
 # only dnf: entries (the flatpak: entries moved to FLATPAK_APPS and
@@ -595,7 +600,7 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "render", "link"]
+depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "luks-notice", "render", "link"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.

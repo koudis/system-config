@@ -6,7 +6,7 @@
 # populates every managed tool's directory without pulling in the desktop
 # applications:
 #
-#   test/run.sh acceptance "nvim ::: bac ::: link" unprivileged
+#   test/run.sh acceptance "nvim ::: bac ::: luks-notice ::: link" unprivileged
 
 # Criterion 3. `git ls-files -s`, not `git submodule status`, is the primary
 # test: it sees a gitlink whether or not `.gitmodules` declares one, and an
@@ -43,7 +43,7 @@ assert_cmd "no ssh urls" \
     bash -c '! git grep -q "git@github.com" -- "*.toml" setup ":!test/checks-acceptance.sh"'
 
 assert_cmd "every tool has a requirements document" \
-    bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps bootstrap-ai-coding; do
+    bash -c 'for t in zsh neovim cmake cmakelib go kitty desktop-apps bootstrap-ai-coding luks-automount; do
                  test -f "docs/requirements/tool-$t.md" || exit 1
              done'
 
@@ -52,7 +52,7 @@ assert_cmd "every tool has a requirements document" \
 # installed application directory, not the repository, so they need a target
 # that actually populates it (unlike every check above).
 assert_cmd "one directory per managed tool" bash -c '
-    for tool in go cmake cmakelib mise nvim ohmyzsh bac; do
+    for tool in go cmake cmakelib mise nvim ohmyzsh bac luks-automount; do
         [ -d "${APP_DIR}/${tool}" ] || { echo "missing: ${tool}" >&2; exit 1; }
     done
 '

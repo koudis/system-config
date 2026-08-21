@@ -12,12 +12,14 @@ System config repo to configure basics applications after fresh Linux install.
 - ZSH
 - Kitty
 - [bootstrap-ai-coding] (`bac`) - containerised AI coding sessions
+- [luks-automount] - unlocks and mounts encrypted removable disks
 - Desktop applications, installed as Flatpaks from Flathub
 
 One requirements document per entry lives in `docs/requirements/`.
 
 [CMakeLib]: https://github.com/cmakelib/cmakelib
 [bootstrap-ai-coding]: https://github.com/koudis/bootstrap-ai-coding
+[luks-automount]: https://github.com/koudis/luks-automount
 
 ## Build and Install
 
@@ -55,8 +57,9 @@ A single task can be run on its own by naming it, for example `./setup link`.
 
 ## External prerequisites
 
-Two things `bac` needs at run time are deliberately neither installed nor
-configured by setup.
+Some things setup deliberately neither installs nor configures. Two of them
+`bac` needs at run time; the third is a one-time step `luks-automount` leaves
+to you.
 
 **A Docker engine.** `bac` speaks the Docker Engine API and refuses to start
 against a daemon older than 20.10. Fedora's own `moby-engine` package is *not*
@@ -77,6 +80,30 @@ it for you.
 
 **An SSH key pair.** `bac` reads `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`,
 or the path given to its `--ssh-key` flag. It does not create one.
+
+**One manual step for `luks-automount`.** Setup compiles the binary and stages
+it at `$APP_DIR/luks-automount/bin/luks-automount`. It does not install it.
+Upstream's own installer is what places the operational copy at
+`/usr/local/bin/luks-automount`, writes a sudoers rule granting passwordless
+root execution of that binary's `worker` subcommand, and enables a systemd user
+service - three paths outside `$APP_DIR`, two of them requiring elevation. A
+`NOPASSWD` sudo rule is a machine-wide privilege decision of the same kind as
+`docker` group membership above, which is why setup names it rather than taking
+it:
+
+```bash
+~/App/luks-automount/bin/luks-automount install
+```
+
+It asks before each of its three steps. Setup prints that command whenever the
+installed copy is missing or differs from the staged one, and stays silent when
+the two match - so after a pin bump, run it again.
+
+Registering a disk is separate and also yours: `luks-automount add <name>`
+prompts for the device, the mount point under `/mnt/`, the filesystem and the
+passphrase, storing the passphrase in the session keyring. Mount points under
+`/mnt/` must exist beforehand. None of that is reproducible from this
+repository, and none of it is lost by deleting `$APP_DIR`.
 
 ## Generated files
 
