@@ -472,7 +472,7 @@ printf '%s\n%s\n' "$LUKS_REF" "$APP_DIR" > .build/luks.version
 #
 # What this produces is a staged binary, not an installed one. The operational
 # copy is placed by upstream's own installer at a fixed system path, which is
-# not setup's step to take (LUKS-R-3); [tasks.luks-notice] below names it.
+# not setup's step to take (LUKS-R-3); [tasks.manual] below names it.
 [tasks.luks]
 depends = ["tools", "preflight", "fetch", "luks-stamp"]
 sources = [".build/luks.version"]
