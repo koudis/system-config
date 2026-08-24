@@ -141,10 +141,11 @@ cmakelib owns them (CMLIB-R-3) empties the fragment completely, so it is
 deleted rather than ported.
 
 **ZSH-R-8** Placeholders substituted at render time SHALL be limited to values
-genuinely unknown until setup runs. Three remain in this tool: the framework
-path, the custom directory (ZSH-R-14) and the global configuration file
-(ZSH-R-15). The CMake library path leaves with the fragment (ZSH-A-6), and two
-path fragments are removed outright (ZSH-R-10, ZSH-R-11).
+genuinely unknown until setup runs. Four remain in this tool: the framework
+path, the custom directory (ZSH-R-14), the global configuration file
+(ZSH-R-15) and that configuration's root (ZSH-R-16). The CMake library path
+leaves with the fragment (ZSH-A-6), and two path fragments are removed outright
+(ZSH-R-10, ZSH-R-11).
 
 **ZSH-R-14** The custom directory SHALL have its own placeholder,
 `___ZSH_CUSTOM_DIR___`, distinct from the framework-path placeholder and from
@@ -153,6 +154,14 @@ values - the framework is fetched runtime content outside the committed tree,
 the custom directory is committed repository content, and the configuration
 file is this repository's own `mise.toml`, reached by a second route - and a
 single placeholder cannot yield all three.
+
+The fourth placeholder, `___SYSTEM_CONFIG_DIR___` (ZSH-R-16), is the one
+exception to that separation: it names the repository root, which is the
+configuration file placeholder's value minus its final path component. It is
+nonetheless a placeholder of its own rather than a substring the shell derives
+at runtime, because the rendered file is what the requirement is checked
+against, and a derivation would move the value out of the rendered text and
+into shell behaviour that only runs on a live machine.
 
 **ZSH-R-9** The configuration SHALL NOT export another tool's settings
 (GEN-R-9). The CMake library's environment currently originates here; it SHALL
@@ -169,8 +178,9 @@ GEN-R-2.
 
 **ZSH-R-13** The rendered configuration SHALL export the application
 directory, the orchestrator's data directory, the orchestrator's installs
-directory, the search path and the global configuration file (ZSH-R-15)
-**before** activating the orchestrator, in that order. The data directory and
+directory, the search path, the global configuration file (ZSH-R-15) and that
+configuration's root (ZSH-R-16) **before** activating the orchestrator, in that
+order. The data directory and
 the installs directory are read at process start (GEN-A-7, GEN-A-11), so
 activation that happens first uses the orchestrator's default locations and
 every tool an interactive shell installs from then on lands outside the
@@ -192,6 +202,20 @@ therefore machine-wide. The variable is read before configuration is parsed
 and SHALL therefore be exported above the activation line and SHALL NOT be
 set from `[env]`.
 
+**ZSH-R-16** The rendered configuration SHALL also name this repository as the
+global configuration's root, from the same rendered value as the configuration
+file itself (ZSH-R-15). A global configuration's root defaults to `$HOME`, and
+the orchestrator runs every task with the working directory set to the root of
+the configuration that defines it, resolving each task's declared sources and
+outputs against that same root. Naming the configuration file without naming
+its root therefore retargets every relative path in it from this repository to
+`$HOME` - the freshness stamps, the fetched custom plugin, the rendered
+outputs - and fails outright the tasks that ask git for the repository root,
+because `$HOME` is not a work tree. Rendering the two from one value is what
+keeps them from drifting apart. The variable is read before configuration is
+parsed and SHALL therefore be exported above the activation line and SHALL NOT
+be set from `[env]`, for the same reason as ZSH-R-15.
+
 ## 9. Verification
 
 | Requirement | Check |
@@ -204,8 +228,9 @@ set from `[env]`.
 | ZSH-R-9 | The CMake library environment is traceable to that tool's document |
 | ZSH-R-11 | No path in the rendered configuration references a missing directory |
 | ZSH-R-12 | The plugin loads in an interactive shell, and no symbolic link stands in for it |
-| ZSH-R-13 | In the rendered file the five exports appear above the activation line; deleting any one of them, or moving it below the activation, fails the check |
+| ZSH-R-13 | In the rendered file the six exports appear above the activation line; deleting any one of them, or moving it below the activation, fails the check |
 | ZSH-R-13a | A shell started on a machine with no orchestrator prints nothing and exits zero; on a configured machine activation still takes effect |
 | ZSH-R-14 | The rendered file contains no unsubstituted placeholder, and the framework path and the custom directory resolve to different roots |
 | ZSH-R-15 | An interactive shell started outside this repository resolves every pinned tool by name and reports the pinned version, and resolves `cmake` to the pinned version rather than the system one |
+| ZSH-R-16 | A task run from a login shell outside this repository, with the rendered profile in scope, reports this repository as its working directory and writes its freshness stamp inside this repository rather than under `$HOME` |
 | ZSH-A-8 | After setup the login shell is the absolute path to Zsh, and a second run reports it as already set |

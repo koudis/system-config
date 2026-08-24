@@ -154,6 +154,15 @@ export PATH="$APP_DIR/mise/bin:$APP_DIR/nvim/bin:$APP_DIR/bac/bin:$PATH"
 # second pin: it is the same file, reached by a second route. Read before the
 # configuration is parsed, so it cannot come from [env].
 export MISE_GLOBAL_CONFIG_FILE="___MISE_CONFIG_FILE___"
+# A global configuration's root defaults to $HOME, and mise runs every task
+# with the working directory set to the root of the configuration that defines
+# it. Without this the line above silently retargets every relative path in
+# mise.toml - the freshness stamps, the fetched custom plugin, the rendered
+# outputs - from this repository to $HOME, and the tasks that ask git for the
+# repository root fail outright. Read before the configuration is parsed, for
+# the same reason as the line above, and rendered from the same value so the
+# two cannot drift apart.
+export MISE_GLOBAL_CONFIG_ROOT="___SYSTEM_CONFIG_DIR___"
 # Guarded the same way setup and the harness guard theirs: on a machine where
 # ./setup has not run yet, mise is absent and every shell start would otherwise
 # report it.

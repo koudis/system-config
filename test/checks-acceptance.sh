@@ -173,3 +173,25 @@ login_places_orchestrator_dirs() {
 }
 assert_cmd "a login shell places both orchestrator directories under APP_DIR" \
     login_places_orchestrator_dirs
+
+# ZSH-R-16, on the same shell. Every other check in the harness runs a task with
+# cwd already inside the clone, where the configuration is found by upward walk
+# and is rooted at the repository for free - so nothing else here would notice a
+# global configuration whose root fell back to $HOME. That fallback is not a
+# cosmetic difference: the root is the working directory mise hands every task,
+# and the root it resolves their declared sources and outputs against, so the
+# whole file silently retargets from the repository to $HOME.
+#
+# The stamp task is the observable, because it is cheap, has no freshness gate
+# of its own, and writes to a relative path - .build/luks.version - which lands
+# under whichever root is in force. A rooted run leaves it in the clone and
+# leaves no $HOME/.build at all.
+login_task_runs_in_the_repository() {
+    local repo="$PWD"
+    [[ ! -e "$HOME/.build" ]] || return 1
+    login_shell "mise run luks-stamp" >/dev/null || return 1
+    [[ ! -e "$HOME/.build" ]] &&
+    [[ -f "$repo/.build/luks.version" ]]
+}
+assert_cmd "a task run from a login shell outside the repository is rooted in it" \
+    login_task_runs_in_the_repository

@@ -69,6 +69,26 @@ assert_cmd "global config file exported before activation" bash -c '
 assert_cmd "global config file points at the pin registry" bash -c '
     grep -q "^export MISE_GLOBAL_CONFIG_FILE=\"$PWD/mise.toml\"" zsh/zshrc
 '
+# ZSH-R-16. Naming the configuration file without naming its root leaves the
+# root at $HOME, which is the working directory mise then hands every task and
+# the root it resolves their sources and outputs against.
+assert_cmd "global config root exported before activation" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_ROOT=" zsh/zshrc &&
+    [ "$(grep -n "^export MISE_GLOBAL_CONFIG_ROOT=" zsh/zshrc | cut -d: -f1)" \
+      -lt "$(grep -n "mise activate zsh" zsh/zshrc | cut -d: -f1)" ]
+'
+assert_cmd "global config root is this repository, not \$HOME" bash -c '
+    grep -q "^export MISE_GLOBAL_CONFIG_ROOT=\"$PWD\"" zsh/zshrc
+'
+# The two are rendered from one value, so the root must be exactly the
+# configuration file's directory - a pair that disagrees is worse than either
+# being absent, because tasks would then run against a different tree than the
+# one holding the pins they read.
+assert_cmd "config root is the config file's own directory" bash -c '
+    f=$(sed -n "s/^export MISE_GLOBAL_CONFIG_FILE=\"\(.*\)\"$/\1/p" zsh/zshrc)
+    r=$(sed -n "s/^export MISE_GLOBAL_CONFIG_ROOT=\"\(.*\)\"$/\1/p" zsh/zshrc)
+    [[ -n $f && -n $r ]] && [[ "${f%/mise.toml}" == "$r" ]]
+'
 assert_cmd "no unsubstituted placeholder" bash -c '! grep -q "___" zsh/zshrc'
 
 # GEN-R-1a / Task 9's acceptance assertion: THIS REPOSITORY's own search-path
@@ -90,19 +110,20 @@ assert_cmd "the repository's own PATH export names exactly three APP_DIR entries
     grep -qF "\$APP_DIR/bac/bin" <<< "$value"
 '
 
-# ZSH-R-13 in full. The three checks above each compare one export against the
-# activation line; the requirement also fixes the order of the five relative to
+# ZSH-R-13 in full. The checks above each compare one export against the
+# activation line; the requirement also fixes the order of the six relative to
 # one another, and APP_DIR and the search path had no position check at all.
-# One comparison chain covers all of it, so deleting any of the five (an empty
+# One comparison chain covers all of it, so deleting any of the six (an empty
 # line number fails the -n test) or moving one out of sequence fails here.
-assert_cmd "the five exports appear in the declared order above activation" bash -c '
+assert_cmd "the six exports appear in the declared order above activation" bash -c '
     n() { grep -n "$1" zsh/zshrc | head -1 | cut -d: -f1; }
     a=$(n "^export APP_DIR=")
     d=$(n "^export MISE_DATA_DIR=")
     i=$(n "^export MISE_INSTALLS_DIR=")
     p=$(n "^export PATH=\"\$APP_DIR")
     g=$(n "^export MISE_GLOBAL_CONFIG_FILE=")
+    r=$(n "^export MISE_GLOBAL_CONFIG_ROOT=")
     act=$(n "mise activate zsh")
-    [[ -n $a && -n $d && -n $i && -n $p && -n $g && -n $act ]] || exit 1
-    [[ $a -lt $d && $d -lt $i && $i -lt $p && $p -lt $g && $g -lt $act ]]
+    [[ -n $a && -n $d && -n $i && -n $p && -n $g && -n $r && -n $act ]] || exit 1
+    [[ $a -lt $d && $d -lt $i && $i -lt $p && $p -lt $g && $g -lt $r && $r -lt $act ]]
 '

@@ -29,10 +29,17 @@ LUKS_REF           = "v0.0.2"
 #
 # The config_root template value is prohibited in this file: this file is
 # also loaded as the machine-global mise configuration, where config_root
-# defaults to $HOME rather than the repository. Upstream's
-# MISE_GLOBAL_CONFIG_ROOT could change that default, but is deliberately not
-# used here - the paths this configuration needs live under the application
-# directory, and {{env.APP_DIR}} addresses them correctly by either route.
+# defaults to $HOME rather than the repository. {{env.APP_DIR}} addresses the
+# paths these two values need correctly by either route.
+#
+# Superseded in part: this note used to add that MISE_GLOBAL_CONFIG_ROOT "is
+# deliberately not used here", on the grounds that no [env] value needs it.
+# That reasoning was sound for [env] and wrong for the file as a whole - the
+# same $HOME default is also the working directory mise hands every task, and
+# the root against which it resolves each task's sources and outputs. The
+# rendered profile now exports it (ZSH-R-16). The prohibition on the
+# config_root template itself stands: the variable fixes the default, and
+# templating the value would still read $HOME on any process that lacks it.
 CMLIB_DIR                       = "{{env.APP_DIR}}/cmakelib/cmakelib"
 CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{env.APP_DIR}}/cmakelib/"
 
@@ -246,7 +253,14 @@ depends = ["preflight"]
 run = """
 set -euo pipefail
 "$ORCHESTRATOR_BIN" install
-root="$(git rev-parse --show-toplevel)"
+# MISE_TASK_DIR, not `git rev-parse --show-toplevel`: mise runs a task with the
+# working directory set to the root of the configuration that defines it, and
+# when this file is loaded as the global configuration that root is $HOME - not
+# a work tree, so git exits 128 and the task dies before it can prune anything.
+# MISE_TASK_DIR names the directory of the file the task came from, which is
+# this repository by either route. MISE_GLOBAL_CONFIG_ROOT (ZSH-R-16) makes the
+# working directory correct as well; this keeps the task right even without it.
+root="$MISE_TASK_DIR"
 pinned=$(awk 'index($0,"[tools]")==1 {f=1; next} index($0,"[")==1 {f=0} f' "$root/mise.toml" \
          | grep -E '^[A-Za-z]' | cut -d= -f1 | tr -d '[:blank:]' || true)
 if [[ -z $pinned ]]; then
@@ -261,7 +275,8 @@ MISE_YES=1 "$ORCHESTRATOR_BIN" prune --tools $pinned
 run = """
 set -euo pipefail
 umask g-w,o-w   # ohmyzsh requires this or compinit fails (ZSH-A-2)
-mkdir -p "$APP_DIR/cmakelib" "$APP_DIR/bac" "$APP_DIR/luks-automount" zsh/custom/plugins
+root="$MISE_TASK_DIR"
+mkdir -p "$APP_DIR/cmakelib" "$APP_DIR/bac" "$APP_DIR/luks-automount" "$root/zsh/custom/plugins"
 
 # R25: never destroy a directory this task did not create. A registered
 # submodule gitlink, or any uncommitted local changes, stop the task with a
@@ -330,7 +345,7 @@ fetch_pinned "$APP_DIR/ohmyzsh" https://github.com/ohmyzsh/ohmyzsh.git "$OHMYZSH
 # Oh My Zsh resolves custom plugins only under $ZSH_CUSTOM/plugins/, so this
 # clones to its real load path (ZSH-A-7, ZSH-R-12). It is the one fetched
 # source that stays inside the repository.
-fetch_pinned zsh/custom/plugins/zsh-autosuggestions https://github.com/zsh-users/zsh-autosuggestions.git "$AUTOSUGGEST_REF"
+fetch_pinned "$root/zsh/custom/plugins/zsh-autosuggestions" https://github.com/zsh-users/zsh-autosuggestions.git "$AUTOSUGGEST_REF"
 fetch_pinned "$APP_DIR/cmakelib/cmakelib" https://github.com/cmakelib/cmakelib.git "$CMLIB_REF"
 fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmconf"  https://github.com/cmakelib/cmakelib-component-cmconf.git  "$CMLIB_CMCONF_REF"
 fetch_pinned "$APP_DIR/cmakelib/cmakelib-component-cmdef"   https://github.com/cmakelib/cmakelib-component-cmdef.git   "$CMLIB_CMDEF_REF"
@@ -534,9 +549,9 @@ fi
 depends = ["fetch"]
 run = """
 set -euo pipefail
-root="$(git rev-parse --show-toplevel)"
+root="$MISE_TASK_DIR"
 
-trap 'rm -f zsh/zshrc.mise-new vim/init.vim.mise-new' EXIT
+trap 'rm -f "$root/zsh/zshrc.mise-new" "$root/vim/init.vim.mise-new"' EXIT
 
 render() {
     local template="$1" out="$2" new="$2.mise-new"
@@ -544,6 +559,7 @@ render() {
         -e "s|___ZSH_CUSTOM_DIR___|${root}/zsh/custom|g" \
         -e "s|___VIM_BASE_DIR___|${root}/vim|g" \
         -e "s|___MISE_CONFIG_FILE___|${root}/mise.toml|g" \
+        -e "s|___SYSTEM_CONFIG_DIR___|${root}|g" \
         "$template" > "$new"
     # sha256sum, not cmp: cmp ships in diffutils, which a minimal Fedora
     # install does not have, and a comparison that errors out would refuse
@@ -563,8 +579,8 @@ render() {
     mv "$new" "$out"
 }
 
-render zsh/template/zshrc_template    zsh/zshrc
-render vim/template/init_template.vim vim/init.vim
+render "$root/zsh/template/zshrc_template"    "$root/zsh/zshrc"
+render "$root/vim/template/init_template.vim" "$root/vim/init.vim"
 """
 
 # R25 applies here too: a target that already exists and is not a symlink
@@ -578,7 +594,7 @@ render vim/template/init_template.vim vim/init.vim
 depends = ["render"]
 run = """
 set -euo pipefail
-root="$(git rev-parse --show-toplevel)"
+root="$MISE_TASK_DIR"
 
 link() {
     local src="$1" dst="$2"

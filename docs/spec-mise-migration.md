@@ -159,10 +159,15 @@ directly beneath that root instead of being buried under the data directory's
 own `installs/` tree. Everything this section says about why a process-start
 variable cannot come from `[env]` applies to the second one identically, and
 so does the two-exporter note above: the rendered zshrc exports both. The
-third process-start variable, `MISE_GLOBAL_CONFIG_FILE`, is exported by the
-rendered zshrc only and is superseded separately in section 5 - the wrapper
-does not need it, because it runs from inside the repository where the
-configuration is found by upward walk anyway. See GEN-R-16 and the
+third and fourth process-start variables, `MISE_GLOBAL_CONFIG_FILE` and
+`MISE_GLOBAL_CONFIG_ROOT`, are exported by the rendered zshrc only and are
+superseded separately in section 5 - the wrapper does not need them, because it
+runs from inside the repository where the configuration is found by upward walk
+anyway, and a configuration found that way is already rooted at the repository.
+The second of the two is not optional decoration on the first: naming the
+configuration file alone leaves its root at `$HOME`, which is then the working
+directory every task runs in and the root their declared sources and outputs
+resolve against (ZSH-R-16). See GEN-R-16 and the
 application-layout spec.
 
 ### 5.2 System packages - use `[bootstrap.packages]`, with a fallback
