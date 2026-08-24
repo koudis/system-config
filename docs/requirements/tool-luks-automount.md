@@ -121,6 +121,12 @@ they are identical, and SHALL exit zero in every case. A fresh machine has not
 run the one-time step by construction; failing there would make setup fail on
 the machine it exists to configure.
 
+`AMENDED 2026-08-25`: the comparison and its wording are unchanged and remain
+this tool's, but the printing now happens from the shared report GEN-R-22a
+requires rather than from a notice task belonging to this tool. Nothing about
+what is compared, when, or what is printed changed with the move; the assertions
+covering it live in `test/checks-manual.sh`.
+
 **LUKS-R-5** Setup SHALL NOT create the sudoers rule, SHALL NOT enable or start
 the user service, and SHALL NOT create mount points. The sudoers rule grants
 passwordless root execution of a specific binary; that is a machine-wide
@@ -204,7 +210,7 @@ anything.
 | LUKS-R-2, LUKS-A-5 | The build succeeds in the unprivileged harness image, which carries no prerequisite this repository does not declare and no system Go |
 | LUKS-R-2a | Both packages are installed after the privileged phase |
 | LUKS-R-3, LUKS-A-8, LUKS-R-5 | After a full unprivileged run, the fixed system path, the sudoers path and the user unit path all remain absent |
-| LUKS-R-4 | With the system copy absent, the notice names the staged binary's absolute path followed by the install subcommand, and the task exits zero. The differing and identical branches are verified on a real machine, not in the harness: the fixed path is root-owned and the unprivileged image has no elevation with which to stage them |
+| LUKS-R-4 | With the system copy absent, the shared report (GEN-R-22) names the staged binary's absolute path followed by the install subcommand, and the run exits zero. The differing and identical branches are verified on a real machine, not in the harness: the fixed path is root-owned and the unprivileged image has no elevation with which to stage them |
 | LUKS-R-6, LUKS-R-7 | After a full unprivileged run, this tool's configuration directory under the user's configuration directory does not exist, and no template or task body outside this tool's own tasks names it |
 | LUKS-R-8 | The bare binary name does not resolve after a full unprivileged run |
 | LUKS-R-9 | The staged binary resolves at `<application directory>/luks-automount/bin/luks-automount`, and the source checkout at `<application directory>/luks-automount/src` |

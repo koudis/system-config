@@ -58,33 +58,8 @@ assert_cmd "setup does not touch the tool configuration directory" bash -c '
 assert_cmd "the checkout has exactly one fetch site" bash -c '
     [[ $(grep -cF "fetch_pinned \"\$APP_DIR/luks-automount/src\"" mise.toml) -eq 1 ]]'
 
-# LUKS-R-4. Only the absent branch is reachable here: /usr/local/bin is
-# root-owned and this image has no sudo, so neither the differing nor the
-# identical branch can be staged. Both are verified on a real machine instead,
-# and the verification table in the requirements document says so.
-#
-# Two invocations captured up front, then asserted three ways. Each ./setup
-# re-traverses this task's declared predecessors - fetch reaches the network,
-# tools runs an install and a prune - so calling it once per assertion would
-# multiply that work for nothing. The `|| rc=$?` form is required rather than
-# stylistic: this file is sourced under `set -e`, where a bare command
-# substitution that exits non-zero would abort the whole run before any
-# assertion reported.
-notice_rc=0
-notice_out=$(./setup luks-notice 2>&1) || notice_rc=$?
-notice_again=$(./setup luks-notice 2>&1) || true
-
-assert_cmd "the notice names the install command when nothing is installed" \
-    bash -c 'grep -qF "$1" <<< "$2"' _ \
-    "${APP_DIR}/luks-automount/bin/luks-automount install" "$notice_out"
-# A fresh machine has not run the one-time step by construction, so the notice
-# firing must not be a failure - it would fail setup on exactly the machine
-# setup exists to configure.
-assert_cmd "the notice exits zero when nothing is installed" \
-    bash -c '[ "$1" -eq 0 ]' _ "$notice_rc"
-# The notice is ungated on purpose: the build it follows is freshness-gated, so
-# on a second run the build is skipped and a message printed from inside it
-# would not print. Requiring the text on the second invocation too is what
-# distinguishes the two shapes.
-assert_cmd "the notice still fires on a repeat run" \
-    bash -c 'grep -qF "luks-automount install" <<< "$1"' _ "$notice_again"
+# LUKS-R-4 moved with the notice. The comparison it requires now lives in
+# [tasks.manual] alongside the other steps setup leaves to the user (GEN-R-22),
+# so its assertions moved to test/checks-manual.sh rather than being duplicated
+# here. What stays this tool's business - the staged binary, the pinned
+# checkout, the stamp - is asserted above.

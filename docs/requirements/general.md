@@ -556,6 +556,49 @@ link steps refuse by name.
 
 ---
 
+## 4a. Steps setup deliberately leaves to the user
+
+**GEN-R-22** Where setup deliberately declines to take a step, and the machine
+still needs that step taken, the run SHALL name it. The naming SHALL happen once
+per run, after every other task; SHALL be conditional on the step still being
+outstanding, so a machine on which it has been taken hears nothing; and SHALL
+exit zero whether or not anything is outstanding.
+
+This is the single exception to the rule that setup produces no informational
+output. It is not a status report on what setup did - that is the orchestrator's
+own business and it already prints it - but the inverse: the boundary of what
+setup will not do, stated at the one moment the user is in a position to act on
+it. A step named unconditionally is a banner, which is read once and ignored
+afterwards; that is why the condition is normative rather than a nicety.
+
+The refusals themselves are argued for where they are made and are unaffected by
+this requirement: GEN-R-17 and GEN-R-19 for machine-state and privilege
+decisions, BAC-R-4 and BAC-R-5 for the container engine, the `docker` group and
+the SSH key pair, LUKS-R-3 and LUKS-R-4 for `luks-automount`'s installer. This
+requirement adds no policy about what setup should or should not do; it governs
+only whether the user is told.
+
+**GEN-R-22a** The steps SHALL be reported together, in one place, rather than
+each tool announcing its own. A per-tool notice makes the count of outstanding
+work unreadable - the user has to collect it from wherever it happened to be
+printed, interleaved with build output - and it puts each tool in the business
+of deciding how to address the user. A tool that needs a manual step contributes
+a case to the shared report; it does not acquire a task of its own.
+
+This supersedes the arrangement in which `luks-automount` had its own notice
+task. The comparison LUKS-R-4 requires is unchanged and still that tool's, only
+its output moved.
+
+**GEN-A-14 The orchestrator has no mechanism of its own for this.** Its
+`doctor` subcommand reports on its own installation and is not extensible, and
+its `confirm` task option prompts for approval rather than reporting, aborting
+the task when no terminal can answer - which would fail setup non-interactively.
+What it does supply is placement: `depends_post` runs a task after the task it
+is attached to and after that task's own body, and does not fire when an
+unrelated target is run alone. `VERIFIED` - observed against mise 2026.8.6.
+
+---
+
 ## 5. Verification of the global requirements
 
 | Requirement | Observable check |
@@ -585,6 +628,8 @@ link steps refuse by name.
 | GEN-D-16 | Every key named in the registry table resolves in the pin file |
 | GEN-R-20 | Searching the requirements directory for any pin-file value other than `min_version` returns nothing; `min_version` is excluded because its only appearances are dated observations ("VERIFIED - observed against mise <version>") naming the release a finding was made against, not restatements of the pin |
 | GEN-R-21 | After a setup run, exactly one full-version directory exists beneath each pinned tool's own directory, and the tool reports the pinned version; the prune step names the tools it may remove and refuses to run when it can name none; a directory shaped like an install of a core tool this repository does not pin survives a second run of the tools task. The pin-bump wording of the requirement is not itself exercised - the harness installs from scratch and never bumps a pin - so removal of a superseded version rests on the dated observation recorded above rather than on an automated check |
+| GEN-R-22 | On a machine satisfying none of the steps, one run names every one of them and exits zero; satisfying a step removes it from the next run's output and drops the reported count; a run with nothing outstanding prints nothing at all |
+| GEN-R-22a | Exactly one task produces the report; no per-tool notice task remains, and nothing references one |
 
 ---
 

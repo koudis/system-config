@@ -502,27 +502,85 @@ install -m 0755 "$src/luks-automount" "$APP_DIR/luks-automount/bin/luks-automoun
 # is what GEN-R-14 exists to prevent. The redirections keep the file names out
 # of the digests being compared.
 #
-# The system path is a literal here and nowhere else: it is upstream's, fixed
-# in its installer and named verbatim by the sudoers rule it writes, so it is a
-# fact about the external tool rather than a path this repository chooses. It is
-# not an install prefix of this repository's (GEN-R-1a) - nothing here ever
+# GEN-R-22. The one place a run names what it deliberately did not do. Four
+# conditions, each checked rather than announced: a step already satisfied says
+# nothing, so a fully configured machine finishes silent and the notice stays
+# worth reading. This is the sole exception to the repository's no-informational
+# -output rule, and it is the point of the task rather than a side effect.
+#
+# It replaced a per-tool notice that covered luks-automount alone. One block, not
+# one per tool: the user reads "what is left for me" once, and a second tool
+# needing a manual step appends a case here rather than a task of its own.
+#
+# Attached to [tasks.all] with depends_post, not depends, so it runs after every
+# other task including [tasks.all]'s own body - depends alone fixes no position.
+# That also keeps it off single targets: `./setup link` says nothing about it.
+#
+# Exits zero always. Every condition it reports is true of a correct fresh
+# machine, so a non-zero exit would fail setup on exactly the machine setup
+# exists to configure.
+#
+# The luks system path is a literal here and nowhere else: it is upstream's,
+# fixed in its installer and named verbatim by the sudoers rule it writes, so it
+# is a fact about the external tool rather than a path this repository chooses.
+# It is not an install prefix of this repository's (GEN-R-1a) - nothing here ever
 # writes to it.
-[tasks.luks-notice]
+[tasks.manual]
 depends = ["luks"]
-run = """
+# A literal string, not the basic """ form the other tasks use: this body needs
+# backslashes and inner double quotes that TOML's escape processing would eat.
+run = '''
 set -euo pipefail
+
+steps=()
+add() { steps+=("$1"); }
+
+# BAC-R-4, first half. `docker info` rather than `command -v docker`: an engine
+# that is installed but not running is the case the README's systemctl line
+# addresses, and a binary test would call that machine configured.
+if ! docker info >/dev/null 2>&1; then
+    add "docker: no engine responds; bac needs one.
+  sudo systemctl enable --now docker"
+fi
+
+# BAC-R-4, second half, reported separately because the fix is a different
+# command and the two conditions are independent. `id -nG` reads the current
+# process, so this keeps naming the step until the next login even after the
+# usermod - which is accurate: the group is what has not taken effect yet.
+# Padded substring match rather than `grep -w`, which would also accept a
+# neighbouring group named docker-something.
+if [[ " $(id -nG) " != *" docker "* ]]; then
+    add "docker: your account is not in the docker group.
+  sudo usermod -aG docker $USER"
+fi
+
+# BAC-R-5. bac reads an existing public key and never creates one.
+if [[ ! -e $HOME/.ssh/id_ed25519.pub && ! -e $HOME/.ssh/id_rsa.pub ]]; then
+    add "ssh: bac reads an existing public key; none found.
+  ssh-keygen -t ed25519"
+fi
+
+# LUKS-R-4, unchanged in substance from the notice this replaced: content, not
+# presence, so a pin bump that changes the binary is reported as well.
 staged="$APP_DIR/luks-automount/bin/luks-automount"
 installed=/usr/local/bin/luks-automount
 if [[ ! -e $installed ]]; then
-    echo "luks-automount: not installed on this machine." >&2
-    echo "luks-automount: run this once, and answer its three prompts:" >&2
-    echo "luks-automount:   $staged install" >&2
+    add "luks-automount: not installed on this machine.
+  $staged install"
 elif [[ "$(sha256sum < "$staged")" != "$(sha256sum < "$installed")" ]]; then
-    echo "luks-automount: $installed differs from the staged build." >&2
-    echo "luks-automount: re-run this to bring it up to date:" >&2
-    echo "luks-automount:   $staged install" >&2
+    add "luks-automount: $installed differs from the staged build.
+  $staged install"
 fi
-"""
+
+[[ ${#steps[@]} -eq 0 ]] && exit 0
+
+noun=steps; verb=remain
+[[ ${#steps[@]} -eq 1 ]] && { noun=step; verb=remains; }
+echo "setup: ${#steps[@]} manual $noun $verb on this machine:" >&2
+for step in "${steps[@]}"; do
+    sed 's/^/setup:   /' <<< "$step" >&2
+done
+'''
 
 # No sources/outputs (R12): mise has open upstream bugs where freshness
 # misfires with multiple outputs, and the body is two renders - always running
@@ -616,7 +674,8 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "luks-notice", "render", "link"]
+depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "luks", "render", "link"]
+depends_post = ["manual"]
 run = "echo setup complete"
 
 # GEN-R-10 requires a mode that reports what would change without changing it.

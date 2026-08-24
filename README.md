@@ -61,6 +61,12 @@ Some things setup deliberately neither installs nor configures. Two of them
 `bac` needs at run time; the third is a one-time step `luks-automount` leaves
 to you.
 
+You do not have to remember which of them this machine still needs. The last
+thing a full `./setup` does is name the ones that are still outstanding, with
+the command for each, and say nothing about the ones already done - so a
+finished machine finishes silent. Run `./setup manual` at any time to ask
+without doing anything else.
+
 **A Docker engine.** `bac` speaks the Docker Engine API and refuses to start
 against a daemon older than 20.10. Fedora's own `moby-engine` package is *not*
 declared as a prerequisite, because it conflicts with the `docker-ce` packages
@@ -95,7 +101,7 @@ it:
 $APP_DIR/luks-automount/bin/luks-automount install
 ```
 
-It asks before each of its three steps. Setup prints that command whenever the
+It asks before each of its three steps. Setup names that command whenever the
 installed copy is missing or differs from the staged one, and stays silent when
 the two match - so after a pin bump, run it again.
 
