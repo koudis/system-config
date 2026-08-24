@@ -525,6 +525,13 @@ install -m 0755 "$src/luks-automount" "$APP_DIR/luks-automount/bin/luks-automoun
 # is a fact about the external tool rather than a path this repository chooses.
 # It is not an install prefix of this repository's (GEN-R-1a) - nothing here ever
 # writes to it.
+# The count is carried in its own variable rather than read from the array's
+# length. mise templates run scripts with Tera before handing them to the shell,
+# and the literal brace-hash sequence in a bash array-length expansion reads as
+# an unclosed Tera comment opener, failing task validation before bash ever sees
+# the script - the same trap [tasks.preflight] documents above, which is why
+# neither the expansion nor a spelled-out example of it can appear inside a task
+# body, comment lines included.
 [tasks.manual]
 depends = ["luks"]
 # A literal string, not the basic """ form the other tasks use: this body needs
@@ -533,7 +540,8 @@ run = '''
 set -euo pipefail
 
 steps=()
-add() { steps+=("$1"); }
+count=0
+add() { steps+=("$1"); count=$((count + 1)); }
 
 # BAC-R-4, first half. `docker info` rather than `command -v docker`: an engine
 # that is installed but not running is the case the README's systemctl line
@@ -572,11 +580,11 @@ elif [[ "$(sha256sum < "$staged")" != "$(sha256sum < "$installed")" ]]; then
   $staged install"
 fi
 
-[[ ${#steps[@]} -eq 0 ]] && exit 0
+[[ $count -eq 0 ]] && exit 0
 
 noun=steps; verb=remain
-[[ ${#steps[@]} -eq 1 ]] && { noun=step; verb=remains; }
-echo "setup: ${#steps[@]} manual $noun $verb on this machine:" >&2
+[[ $count -eq 1 ]] && { noun=step; verb=remains; }
+echo "setup: $count manual $noun $verb on this machine:" >&2
 for step in "${steps[@]}"; do
     sed 's/^/setup:   /' <<< "$step" >&2
 done
