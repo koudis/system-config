@@ -9,6 +9,10 @@
 # under `set -e`, where a bare command substitution that exits non-zero would
 # abort the whole run before any assertion reported.
 
+# Matched without a line anchor on purpose: mise prefixes task output with the
+# task name once enough tasks run in parallel, so `setup:` is not reliably at
+# column zero. The prefix is a presentation detail of the runner and not
+# something these assertions should pin down.
 notice_rc=0
 notice_out=$(./setup manual 2>&1) || notice_rc=$?
 
@@ -33,13 +37,13 @@ assert_cmd "the notice names the luks-automount install command" \
 # step. A machine with a running engine and no group membership must be told
 # the one thing it needs, not both.
 assert_cmd "the engine and the group are reported as separate steps" \
-    bash -c '[ "$(grep -c "^setup:   docker" <<< "$1")" -eq 2 ]' _ "$notice_out"
+    bash -c '[ "$(grep -c "setup:   docker" <<< "$1")" -eq 2 ]' _ "$notice_out"
 
 # The count in the header is what makes the notice readable at a glance, and it
 # is also the cheapest way to prove the steps are counted rather than printed
 # unconditionally.
 assert_cmd "the header counts the outstanding steps" \
-    bash -c 'grep -qE "^setup: 4 manual steps remain" <<< "$1"' _ "$notice_out"
+    bash -c 'grep -qE "setup: 4 manual steps remain" <<< "$1"' _ "$notice_out"
 
 # The notice is ungated on purpose: the build it follows is freshness-gated, so
 # on a second run the build is skipped and a message printed from inside it
@@ -68,7 +72,7 @@ assert_cmd "the SSH step falls silent once a public key exists" \
 assert_cmd "satisfying one step leaves the others named" \
     bash -c 'grep -qF "luks-automount install" <<< "$1"' _ "$with_key"
 assert_cmd "satisfying one step drops the header count" \
-    bash -c 'grep -qE "^setup: 3 manual steps remain" <<< "$1"' _ "$with_key"
+    bash -c 'grep -qE "setup: 3 manual steps remain" <<< "$1"' _ "$with_key"
 
 # GEN-R-22's placement half. The notice is attached to [tasks.all] with
 # depends_post, so it runs after everything else in a full run and does not fire
