@@ -534,6 +534,10 @@ install -m 0755 "$src/luks-automount" "$APP_DIR/luks-automount/bin/luks-automoun
 # body, comment lines included.
 [tasks.manual]
 depends = ["luks"]
+# quiet, so the report reaches the user as itself. Without it mise announces the
+# task and prefixes every line with its name, turning a list the user is meant to
+# act on into build output. This is the one task whose stdout IS the deliverable.
+quiet = true
 # A literal string, not the basic """ form the other tasks use: this body needs
 # backslashes and inner double quotes that TOML's escape processing would eat.
 run = '''
