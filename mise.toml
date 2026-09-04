@@ -43,7 +43,14 @@ LUKS_REF           = "v0.0.2"
 CMLIB_DIR                       = "{{env.APP_DIR}}/cmakelib/cmakelib"
 CMLIB_COMPONENT_LOCAL_BASE_PATH = "{{env.APP_DIR}}/cmakelib/"
 
-# The seventeen desktop applications (APPS-R-11: they live here and nowhere
+# VSCodium's identifier is named on its own because [tasks.codium] needs it to
+# build the launcher, and a second literal would be a second location for the
+# same value (GEN-R-7). It is still one of the eighteen: it reaches
+# FLATPAK_APPS below by reference rather than by repetition, which is why this
+# assignment has to precede that one.
+CODIUM_APP = "com.vscodium.codium"
+
+# The eighteen desktop applications (APPS-R-11: they live here and nowhere
 # else, so GEN-R-7 still holds now that they are no longer in
 # [bootstrap.packages]). Read by [tasks.apps] and by [tasks.preview].
 FLATPAK_APPS = """
@@ -52,7 +59,7 @@ com.prusa3d.PrusaSlicer com.jgraph.drawio.desktop com.usebottles.bottles
 org.texstudio.TeXstudio org.onlyoffice.desktopeditors org.openstreetmap.josm
 com.axosoft.GitKraken org.kde.krita com.github.tchx84.Flatseal
 org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2
-org.kde.tellico
+org.kde.tellico {{env.CODIUM_APP}}
 """
 
 # The orchestrator's own binary, named here rather than left to bare `mise`
@@ -169,6 +176,38 @@ set -euo pipefail
 for app in $FLATPAK_APPS; do
     flatpak install --user --noninteractive --or-update flathub "$app"
 done
+"""
+
+# APPS-R-12. Flatpak exports each application's launcher under its full
+# identifier - exports/bin/com.vscodium.codium - into a directory this
+# repository puts on no search path, so nothing named `codium` resolves from a
+# shell (APPS-A-10). Upstream's own answer is a shell alias; a generated script
+# instead, because an alias is visible only to an interactive zsh and never to
+# a script, to $EDITOR, or to any non-shell caller.
+#
+# Written under the application directory, in a directory named after the tool
+# (GEN-R-1a). A symbolic link into a user binary directory would be exactly the
+# second install prefix that requirement exists to refuse.
+#
+# Deliberately not depends = ["apps"]: the launcher is inert text until the
+# application is installed, so gating it on the install would make verifying it
+# cost a 643 MB download without proving anything more. Both are named by
+# [tasks.all], which is where the two meet on a real machine.
+#
+# `flatpak run` rather than the exported path, because the exported path
+# differs by installation scope while `flatpak run` searches the per-user
+# installation first and then the system ones (APPS-A-10), which is the right
+# answer on a machine carrying both.
+[tasks.codium]
+run = """
+set -euo pipefail
+bin="$APP_DIR/codium/bin"
+mkdir -p "$bin"
+cat > "$bin/codium" <<EOF
+#!/bin/sh
+exec flatpak run $CODIUM_APP "\\$@"
+EOF
+chmod +x "$bin/codium"
 """
 
 # The unprivileged phase's system prerequisites. Blocking here rather than
@@ -686,7 +725,7 @@ link "${root}/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 """
 
 [tasks.all]
-depends = ["preflight", "apps", "tools", "fetch", "nvim", "bac", "luks", "render", "link"]
+depends = ["preflight", "apps", "codium", "tools", "fetch", "nvim", "bac", "luks", "render", "link"]
 depends_post = ["manual"]
 run = "echo setup complete"
 

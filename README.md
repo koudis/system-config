@@ -13,7 +13,9 @@ System config repo to configure basics applications after fresh Linux install.
 - Kitty
 - [bootstrap-ai-coding] (`bac`) - containerised AI coding sessions
 - [luks-automount] - unlocks and mounts encrypted removable disks
-- Desktop applications, installed as Flatpaks from Flathub
+- Desktop applications, installed as Flatpaks from Flathub. VSCodium also gets
+  a generated `codium` launcher on the search path, so it is usable from a
+  script and as `$EDITOR`, not only from an interactive shell.
 
 One requirements document per entry lives in `docs/requirements/`.
 
@@ -127,9 +129,11 @@ To add a tool, follow [docs/adding-a-new-tool.md](docs/adding-a-new-tool.md).
 A checkout from before `./setup` was split into `./setup system` and `./setup`
 needs three one-time steps on its first run under the new layout.
 
-**1. The seventeen Flatpaks.** They used to install system-wide; they now
+**1. The eighteen Flatpaks.** They used to install system-wide; they now
 install in user scope (`APPS-R-10`), and the first `./setup` adds a second,
-user-scope copy of each rather than adopting the system one. The old
+user-scope copy of each rather than adopting the system one. VSCodium was
+declared later than the rest, but lands in the same state on any machine that
+already had it installed system-wide by hand, so it is listed here too. The old
 system-scope copies become dead weight once the user-scope copies land.
 Remove them with the exact identifiers below - not a glob, and not
 `--unused`, because the system installation may hold other applications this
@@ -142,7 +146,7 @@ sudo flatpak uninstall --system \
   org.texstudio.TeXstudio org.onlyoffice.desktopeditors org.openstreetmap.josm \
   com.axosoft.GitKraken org.kde.krita com.github.tchx84.Flatseal \
   org.gnome.Extensions com.mattjakeman.ExtensionManager cc.arduino.IDE2 \
-  org.kde.tellico
+  org.kde.tellico com.vscodium.codium
 ```
 
 These identifiers are declared once, in `mise.toml`'s `FLATPAK_APPS` - re-read

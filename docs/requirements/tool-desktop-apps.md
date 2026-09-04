@@ -4,7 +4,7 @@ Inherits everything in [general.md](general.md).
 
 ## 1. Purpose
 
-Seventeen graphical applications.
+Eighteen graphical applications.
 
 ## 2. Classification
 
@@ -55,7 +55,7 @@ acted on. This failure mode no longer exists here: preflight blocks on an
 absent flatpak before the step runs. APPS-R-2 stands on its remaining grounds.
 
 **APPS-R-3** Tier 3 SHALL be authored per application and SHALL NOT be assumed
-available for all. Several of the seventeen have no buildable source at all -
+available for all. Several of the eighteen have no buildable source at all -
 GitKraken is proprietary - and others are large C++ desktop applications whose
 source builds are substantial projects in their own right. Where tier 3 is
 genuinely needed, that application gets its own requirements document under
@@ -71,9 +71,16 @@ one-time manual cleanup in `README.md`'s "Migrating from a pre-split checkout"
 is carried out. It does not hold automatically from a bare `./setup` run on
 such a machine.
 
+VSCodium, added to the inventory after that move, reaches the same state by a
+different route: it was installed system-wide by hand before it was declared
+here, so the first `./setup` after its declaration adds a user-scope copy
+beside the existing system one. The same one-time `flatpak uninstall --system`
+cleanup applies, and until it is run this requirement does not hold for
+VSCodium either.
+
 ## 4. The inventory
 
-All seventeen are currently tier 1 (Flatpak).
+All eighteen are currently tier 1 (Flatpak).
 
 | Domain | Applications | Tier |
 |---|---|---|
@@ -81,7 +88,7 @@ All seventeen are currently tier 1 (Flatpak).
 | Documents and writing | TeXstudio, OnlyOffice, Obsidian, Anki | 1 |
 | Graphics and diagrams | Krita, drawio | 1 |
 | Geo | JOSM | 1 |
-| Development | GitKraken | 1 |
+| Development | GitKraken, VSCodium | 1 |
 | System | Flatseal, GNOME Extensions, Extension Manager | 1 |
 | Other | Bottles, Tellico | 1 |
 
@@ -135,7 +142,7 @@ Flathub's own Fedora setup page.
 **APPS-A-7** When enabled through Third-Party Repositories the remote may be a
 *filtered* view exposing only a Fedora-approved subset. Adding the remote
 manually removes the filter. A filtered remote can therefore make some of the
-seventeen unavailable while others install normally - a partial, confusing
+eighteen unavailable while others install normally - a partial, confusing
 failure rather than a clean one. `VERIFIED` - Fedora's Flathub remote package
 description and the associated Fedora change proposal.
 
@@ -168,7 +175,7 @@ else, so that GEN-R-7 continues to hold now that they are not declared in
 
 **APPS-A-9** The application install path is never exercised end to end. The
 verification harness proves that the remote exists, that it is unfiltered, and
-that every one of the seventeen identifiers resolves against it - not that the
+that every one of the eighteen identifiers resolves against it - not that the
 applications install. A resolvable identifier can still fail to install for
 reasons no check covers: disk space, architecture mismatch, or a runtime
 conflict. A genuine user-scope Flatpak install needs a working system bus
@@ -183,6 +190,40 @@ apply mechanism as the dnf packages; that no longer holds, because installs
 now go through a direct `flatpak install --user` call outside the mise apply
 mechanism, so nothing bounds whether the install itself succeeds.
 
+## 6b. Command-line access
+
+**APPS-A-10 A Flatpak application is reachable from a shell only under its full
+identifier, and only from a directory this repository does not put on the
+search path.** Installing an application writes a launcher script named after
+the application identifier into that installation's export directory -
+`/var/lib/flatpak/exports/bin/` for a system install,
+`~/.local/share/flatpak/exports/bin/` for a user one - which execs `flatpak
+run` with the arguments forwarded. Neither directory is named in the rendered
+search path, so nothing named `codium` resolves. `flatpak run` itself looks in
+the per-user installation first and then in every system installation, so one
+invocation stays unambiguous on a machine carrying both copies of the same
+application. `VERIFIED` - the exported script read from a configured machine,
+and flatpak-run(1)'s statement of its lookup order.
+
+**APPS-R-12** Where an application is also a command-line tool, setup SHALL
+generate a launcher named after the command, place it under the application
+directory in a directory named after the tool (GEN-R-1a), and name that
+directory in the rendered search path (ZSH-R-13). The launcher SHALL invoke
+`flatpak run` with the declared identifier and SHALL forward its arguments.
+
+The launcher is an installed artifact (GEN-D-14) even though the application it
+starts is a system package: setup produces it, it is machine-local and
+disposable, and it is never committed. A symbolic link into a user binary
+directory SHALL NOT be used instead - that is the second install prefix
+GEN-R-1a exists to refuse.
+
+An alias in the shell configuration SHALL NOT be used either, though upstream
+documents one. An alias is visible only to an interactive shell of that one
+flavour, and never to a script, to `$EDITOR`, or to any other caller, which is
+most of what "reachable from the command line" is asked for.
+
+VSCodium is the only application in the inventory this applies to.
+
 ## 7. Declared inputs
 
 | Input | Source |
@@ -194,15 +235,21 @@ This tool exports nothing and no other tool depends on it, so it has no
 predecessors beyond its own prerequisites and may run in parallel with
 everything else (GEN-R-5).
 
+Amended by APPS-R-12: it now exports one search-path entry, the directory
+holding the generated `codium` launcher. Nothing depends on that entry either,
+so the parallelism above is unchanged.
+
 ## 8. Verification
 
 | Requirement | Check |
 |---|---|
 | APPS-R-2 | Every application in section 4 has a recorded tier |
-| APPS-R-7 | On a machine with Third-Party Repositories disabled and no remote configured, setup still installs all seventeen |
+| APPS-R-7 | On a machine with Third-Party Repositories disabled and no remote configured, setup still installs all eighteen |
 | APPS-R-8 | Setup runs twice in succession without error |
 | APPS-R-4 | No application is installed from two sources simultaneously |
 | APPS-R-9 | The application step declares the remote step as its predecessor |
-| APPS-R-10 | Installed scope is user for all seventeen, and no system remote is added by this repository |
-| APPS-R-11 | The seventeen identifiers appear in mise.toml and in no other tracked file |
-| APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all seventeen are confirmed installed and user-scoped |
+| APPS-R-10 | Installed scope is user for all eighteen, and no system remote is added by this repository |
+| APPS-R-11 | The eighteen identifiers appear in mise.toml and in no other tracked file |
+| APPS-A-9 | Open by construction in the container: closed only by the first run on the real machine, where all eighteen are confirmed installed and user-scoped |
+| APPS-A-10 | The exported launcher's own contents, read from a configured machine, and flatpak-run(1)'s documented lookup order |
+| APPS-R-12 | `codium` resolves on the search path to a launcher under the application directory; that launcher names the declared identifier and forwards its arguments; no rival copy exists in a user binary directory |

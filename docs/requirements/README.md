@@ -20,7 +20,7 @@ instructions to be executed.
 | [tool-cmakelib.md](tool-cmakelib.md) | CMake library and its five components |
 | [tool-go.md](tool-go.md) | Go toolchain - currently unmanaged |
 | [tool-kitty.md](tool-kitty.md) | Terminal emulator - the simplest case |
-| [tool-desktop-apps.md](tool-desktop-apps.md) | Seventeen Flatpak applications |
+| [tool-desktop-apps.md](tool-desktop-apps.md) | Eighteen Flatpak applications |
 | [tool-bootstrap-ai-coding.md](tool-bootstrap-ai-coding.md) | Containerised AI coding sessions - built from source |
 | [tool-luks-automount.md](tool-luks-automount.md) | Encrypted removable disks - built from source, installed by hand |
 | [../adding-a-new-tool.md](../adding-a-new-tool.md) | The procedure for adding a managed tool |
@@ -73,7 +73,7 @@ New identifiers were appended for behaviour that implementation added:
 `GEN-D-15`, `GEN-A-8a`, `GEN-A-11` through `GEN-A-14`, `GEN-R-8b`, `GEN-R-15` through
 `GEN-R-18`, `GEN-R-19`, `GEN-R-22`, `GEN-R-22a`, `ZSH-A-7` through `ZSH-A-9`, `ZSH-R-12` through
 `ZSH-R-16`, `ZSH-R-13a`, `NVIM-R-9`, `NVIM-R-10`, `NVIM-A-7`, `KITTY-R-4`,
-`APPS-R-9`, `APPS-A-9`, `APPS-R-10` and `APPS-R-11`.
+`APPS-R-9`, `APPS-A-9`, `APPS-R-10`, `APPS-R-11`, `APPS-A-10` and `APPS-R-12`.
 
 `APPS-R-5` and `APPS-R-6` are withdrawn, their numbers retired: applications
 are installed in user scope by calling flatpak directly, rather than

@@ -191,7 +191,7 @@ repo's needs, including a **`flatpak` manager** alongside `dnf`:
   authenticates the target user through PAM - which blocks on a password prompt
   for a non-root caller - and sudo's `secure_path` drops `$APP_DIR/bin`, where
   mise itself lives. This apply runs in the privileged phase (GEN-R-19).
-- The `[bootstrap.packages]` table holds `dnf:` entries only. The seventeen
+- The `[bootstrap.packages]` table holds `dnf:` entries only. The eighteen
   Flatpak applications are installed by calling `flatpak` directly from a task
   body, in user scope, rather than through a `flatpak` manager entry in this
   table (APPS-R-10, APPS-R-11).
@@ -217,7 +217,7 @@ instead of six files. The task DAG below is unchanged either way.
 all
  +-- packages   dnf packages + build prerequisites + login_shell
  +-- flathub    ensure flatpak CLI + unfiltered Flathub remote  (depends: packages)
- +-- apps       17 applications, user scope                     (depends: flathub)
+ +-- apps       18 applications, user scope                     (depends: flathub)
  +-- go         [tools] pin                                     (depends: packages)
  +-- cmake      [tools] pin, or source build                    (depends: packages)
  +-- fetch      clone/download + verify vendored sources
@@ -444,10 +444,11 @@ Neovim build prerequisites, verbatim from upstream: `ninja-build`, `cmake`,
 repo installs any of these today. `glibc-gconv-extra` is the trap - split out
 of glibc in Fedora 35+, and without it the build fails on charset errors.
 
-Desktop applications (17): KiCad, FreeCAD, Anki, Obsidian, PrusaSlicer, drawio,
+Desktop applications (18): KiCad, FreeCAD, Anki, Obsidian, PrusaSlicer, drawio,
 Bottles, TeXstudio, OnlyOffice, JOSM, GitKraken, Krita, Flatseal, GNOME
-Extensions, Extension Manager, Arduino IDE2, Tellico. All tier 1 (Flatpak),
-installed in **user scope** - see 7.2.
+Extensions, Extension Manager, Arduino IDE2, Tellico, VSCodium. All tier 1
+(Flatpak), installed in **user scope** - see 7.2. VSCodium also gets a
+generated command-line launcher (APPS-R-12).
 
 Template placeholders. Two are ported, one is **added**, three are **deleted**:
 
@@ -595,7 +596,7 @@ regression guard rather than a live safeguard, and it is retained as such.
    `$HOME/App/go/...` survives, and `go version` works.
 10. No absolute path containing a hardcoded username appears anywhere in the
     repo (`grep -rn '/home/[a-z]' --include='*_template'` returns nothing).
-11. All 17 applications install on a box with Third-Party Repositories disabled
+11. All 18 applications install on a box with Third-Party Repositories disabled
     and no Flathub remote configured, and all report user scope.
 12. Every declared package name resolves in Fedora's repositories - in
     particular `the_silver_searcher` and `python3-neovim`, not `ag` and
@@ -630,7 +631,7 @@ regression guard rather than a live safeguard, and it is retained as such.
   unlike the tarballs. Accepted; SHAs are immutable in practice.
 - **RR5 (medium): the flatpak apply path is never exercised in a container.**
   The harness proves the Flathub remote exists, is unfiltered, and resolves all
-  17 application IDs; it never installs them. A resolvable ID can still fail to
+  18 application IDs; it never installs them. A resolvable ID can still fail to
   install for reasons no check covers - disk space, architecture, runtime
   conflicts - and the first real signal comes from the user's own machine. A
   real `flatpak install --user` needs a working system bus the sandboxed
